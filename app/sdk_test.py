@@ -11,9 +11,9 @@ from myrent_rest_sdk import MyRentRestClient
 from datetime import datetime, timedelta
 
 # === CREDENZIALI REALI (fornite da Aurora) ===
-USERNAME = "partner_rentalpremium_sul"
-PASSWORD = "R3nt4l_Pr3m1um"
-COMPANY  = "sul"          # codice azienda da usare nel body di /authentication
+USERNAME = "..."
+PASSWORD = "..."
+COMPANY  = "..."          # codice azienda da usare nel body di /authentication
 
 client = MyRentRestClient(USERNAME, PASSWORD, COMPANY)
 
