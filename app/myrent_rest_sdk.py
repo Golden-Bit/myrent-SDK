@@ -135,9 +135,9 @@ class MyRentClient:
 # ESEMPIO D’USO                                                          #
 # ---------------------------------------------------------------------- #
 if __name__ == "__main__":
-    USER_ID = "partner_rentalpremium_sul"
-    PASSWORD = "R3nt4l_Pr3m1um"
-    COMPANY_CODE = "sul"          # tenant
+    USER_ID = "..."
+    PASSWORD = "..."
+    COMPANY_CODE = "..."          # tenant
     CHANNEL = "WEB001"            # listino da usare
 
     client = MyRentClient()
