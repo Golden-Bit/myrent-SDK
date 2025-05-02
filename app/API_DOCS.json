@@ -1,0 +1,3207 @@
+openapi: 3.0.1
+info:
+  title: Myrent Booking API
+  description: booking API for reference
+  version: mock-api
+servers:
+  - url: 'https://virtserver.swaggerhub.com/myrent/booking/mock-api'
+  - url: 'https://demo.myrent.it/MyRentDemoEN'
+  - url: 'https://se.mercedes.myrent.it/MyRentMoveMee'
+paths:
+  /api/v1/touroperator/authentication:
+    post:
+      summary:  Authentication details
+      description: Get Authentication token for other request
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                UserId:
+                  type: string
+                Password:
+                  type: string
+                CompanyCode:
+                  type: string
+            examples:
+              '0':
+                value: "{\r\n    \"UserId\":\"xyz\",\r\n    \"Password\":\"XXXXXXX\",\r\n    \"companyCode\":\"*******\"\r\n}"
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                 type: object
+              examples:
+                '0':
+                  value: "{\r\n    \"status\": true,\r\n    \"message\": \"success\",\r\n    \"result\": {\r\n        \"user_id\": 1,\r\n        \"username\": \"xyz\",\r\n        \"tokenValue\": \"63b2960ffc4c38fbdbeec8\",\r\n        \"userRole\": \"Administrator\"\r\n    }\r\n}"
+
+  /api/v1/touroperator/locations:
+    get:
+      summary: find locations
+      description:  <b>Q.2-</b> locations - what are the possible type values? <br>
+        <b>Location Type</b>- My Rent to provide the possible values</br>
+        BOOKING_PICKUP = 1 (location allowed only for pick up)</br>
+        BOOKING_DROPOFF = 2 (location allowed only for dropoff)</br>
+        BOOKING_BOTH = 3 (location allowed for pick up / drop off)</br>
+         <b>Q3-</b> locations - Is the location code an IATA code? if so, do you have one for all locations?
+         <br>
+        <b>Location Code</b>-It’s instance specific, but will be IATA if one is available.  </br>
+        [QUESTION ] can they change these values?<br>
+        [ANSWER] Yes the customer can change the value
+
+
+      parameters:
+        - name: tokenValue
+          in: header
+          schema:
+            type: string
+          example: a2f47f7d727cb7c3a9d7321cc69e6004
+      responses:
+        '200':
+          description: Auto generated using Swagger Inspector
+          content:
+            application/json:
+              schema:
+                  $ref: '#/components/schemas/locationResponse'
+              examples:
+                '0':
+                  value: "[\n    {\n        \"locationCode\": \"XRJ\",\n        \"locationName\": \"ROMA TERMINI\",\n        \"locationAddress\": \"Via Giovanni Giolitti\",\n        \"locationNumber\": \"16\",\n        \"locationCity\": \"ROMA\",\n        \"locationType\": 3,\n        \"telephoneNumber\": \"+393485330898\",\n        \"cellNumber\": \"+393485330898\",\n        \"email\": \"termini@noleggiare.it\",\n        \"latitude\": 41.899382,\n        \"longitude\": 12.50252,\n        \"isAirport\": false,\n        \"isRailway\": false,\n        \"isAlwaysOpentrue\": null,\n        \"isCarSharingEnabled\": false,\n        \"allowPickUpDropOffOutOfHours\": false,\n        \"hasKeyBox\": false,\n        \"morningStartTime\": null,\n        \"morningStopTime\": null,\n        \"afternoonStartTime\": null,\n        \"afternoonStopTime\": null,\n        \"locationInfoEN\": null,\n        \"locationInfoLocal\": null,\n        \"openings\": [\n            {\n                \"dayOfTheWeek\": 1,\n                \"dayOfTheWeekName\": \"Monday\",\n                \"startTime\": \"08:00\",\n                \"endTime\": \"20:00\"\n            },\n            {\n                \"dayOfTheWeek\": 2,\n                \"dayOfTheWeekName\": \"Tuesday\",\n                \"startTime\": \"08:00\",\n                \"endTime\": \"20:00\"\n            },\n            {\n                \"dayOfTheWeek\": 3,\n                \"dayOfTheWeekName\": \"Wednesday\",\n                \"startTime\": \"08:00\",\n                \"endTime\": \"20:00\"\n            },\n            {\n                \"dayOfTheWeek\": 4,\n                \"dayOfTheWeekName\": \"Thursday\",\n                \"startTime\": \"08:00\",\n                \"endTime\": \"20:00\"\n            },\n            {\n                \"dayOfTheWeek\": 5,\n                \"dayOfTheWeekName\": \"Friday\",\n                \"startTime\": \"08:00\",\n                \"endTime\": \"20:00\"\n            },\n            {\n                \"dayOfTheWeek\": 6,\n                \"dayOfTheWeekName\": \"Saturday\",\n                \"startTime\": \"08:00\",\n                \"endTime\": \"18:00\"\n            },\n            {\n                \"dayOfTheWeek\": 7,\n                \"dayOfTheWeekName\": \"Sunday\",\n                \"startTime\": \"08:00\",\n                \"endTime\": \"13:00\"\n            }\n        ],\n        \"closing\": [\n            {\n                \"dayOfTheWeek\": 6,\n                \"dayOfTheWeekName\": \"Saturday\",\n                \"startTime\": \"18:01\",\n                \"endTime\": \"23:59\"\n            },\n            {\n                \"dayOfTheWeek\": 7,\n                \"dayOfTheWeekName\": \"Sunday\",\n                \"startTime\": \"13:01\",\n                \"endTime\": \"23:59\"\n            }\n        ],\n        \"festivity\": [],\n        \"minimumLeadTimeInHour\": null,\n        \"country\": \"ITALIA\",\n        \"zipCode\": \"00185\"\n    }]"
+  /api/v1/touroperator/damages/{plateNumber/vin}:
+    get:
+      summary: find damages
+      description:  vehicle damages with wireframe image
+      parameters:
+        - name: tokenValue
+          in: header
+          schema:
+            type: string
+          example: a2f47f7d727cb7c3a9d7321cc69e6004
+        - name: Accept-Language
+          in: header
+          schema:
+            type: string
+          example: en_GB
+        - name: plateNumber/vin
+          in: path
+          required: true
+          schema:
+            type: string
+            example: 'FT233AP'
+      responses:
+        '200':
+          description: get vehicle damages with wireframe image
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      damages:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/Damage'
+                      wireframeImage:
+                        type: object
+                        items:
+                          $ref: '#/components/schemas/wireframeImage'
+  /api/v1/touroperator/quotations:
+    post:
+      summary:  Quotaion details
+      description: Get quotaions for location pickup  with avalibility
+      parameters:
+        - name: tokenValue
+          in: header
+          schema:
+            type: string
+          example: a2f47f7d727cb7c3a9d7321cc69e6004
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                dropOffLocation:
+                  type: string
+                endDate:
+                  type: string
+                pickupLocation:
+                  type: string
+                startDate:
+                  type: string
+                age:
+                  type: integer
+                channel:
+                  type: string
+                showPics:
+                  type: boolean
+                showOptionalImage:
+                  type: boolean
+                showVehicleParameter:
+                  type: boolean
+                showVehicleExtraImage:
+                  type: boolean
+                agreementCoupon:
+                  type: string
+                discountValueWithoutVat:
+                  type: string
+                macroDescription:
+                  type: string
+                showBookingDiscount:
+                  type: boolean
+                isYoungDriverAge:
+                  type: boolean
+                isSeniorDriverAge:
+                  type: boolean
+
+            examples:
+              '0':
+                value: "{\r\n  \"endDate\": \"2022-11-24T05:18:33\",\r\n  \"startDate\": \"2022-11-23T05:18:33\",\r\n  \"age\": 25,\r\n  \"pickupLocation\": \"FCO\",\r\n  \"dropOffLocation\": \"FCO\",\r\n  \"channel\": \"WEB001\",\r\n  \"showPics\": true,\r\n  \"showOptionalImage\": true,\r\n  \"showVehicleParameter\": true,\r\n  \"showVehicleExtraImage\": true,\r\n \"agreementCoupon\":\"ABCD\"\r\n}"
+              '1':
+                value: "{\r\n  \"endDate\": \"2022-12-30T05:18:33\",\r\n  \"startDate\": \"2022-12-28T05:18:33\",\r\n  \"age\": 25,\r\n  \"pickupLocation\": \"COM\",\r\n  \"dropOffLocation\": \"COM\",\r\n  \"channel\": \"WEB003\",\r\n  \"showPics\": true,\r\n  \"showOptionalImage\": true,\r\n  \"showVehicleParameter\": true,\r\n  \"showVehicleExtraImage\": true,\r\n \"agreementCoupon\":\"JGKL10\",\r\n \"discountValueWithoutVat\":\"10\",    \r\n \"macroDescription\":\"FURGONI\"\r\n} \r\n"
+              '2':
+                value: "{\r\n  \"endDate\": \"2023-04-25T09:00:00\",\r\n  \"startDate\": \"2023-04-24T08:00:00\",\r\n  \"pickupLocation\": \"BOLOGNA AIRPORT\",\r\n  \"dropOffLocation\": \"BOLOGNA AIRPORT\",\r\n  \"age\": \"25\",\r\n  \"channel\": \"WEB001\",\r\n  \"showPics\": true,\r\n  \"showVehicleParameter\":true,\r\n  \"showOptionalImage\": true,\r\n  \"showVehicleExtraImage\": true,\r\n  \"showBookingDiscount\":true,\r\n  \"isYoungDriverAge\": true,\r\n  \"isSeniorDriverAge\": false,\r\n  \"noFeeAge\":false\r\n} \r\n"
+              '3':
+               value: "{ \r\n    \"age\": 25,\r\n    \"showPics\": true,\r\n    \"showOptionalImage\": true,\r\n    \"showVehicleParameter\": true,\r\n    \"showVehicleExtraImage\": true,\r\n    \"macroGroupName\": \" \",\r\n    \"endDate\": \"2023-04-30T08:00:00\",\r\n    \"startDate\": \"2023-04-25T08:00:00\",\r\n    \"pickupLocation\": \"AHO100\",\r\n    \"dropOffLocation\": \"AHO100\",\r\n    \"channel\": \"WEB001\",\r\n    \"agreementCoupon\": \" \",\r\n    \"discountValueWithoutVat\": \"0\",\r\n    \"isYoungDriverAge\": \"true\",\r\n    \"isSeniorDriverAge\": \"false\",\r\n    \"noFeeAge\": \"false\"\r\n}"
+
+
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                 $ref: '#/components/schemas/quotationResponse'
+              examples:
+                '0':
+                  value: "{\r\n    \"data\": {\r\n        \"total\": 11,\r\n        \"PickUpLocation\": \"COM\",\r\n        \"ReturnLocation\": \"COM\",\r\n        \"PickUpDateTime\": \"2022-12-28T05:18:00.000Z\",\r\n        \"ReturnDateTime\": \"2022-12-28T15:18:00.000Z\",\r\n        \"Vehicles\": [\r\n            {\r\n                \"Status\": \"Unavailable\",\r\n                \"Reference\": {\r\n                    \"ID\": 0,\r\n                    \"ID_Context\": 213.5,\r\n                    \"Type\": 0\r\n                },\r\n                \"Vehicle\": {\r\n                    \"vehicleParameter\": [\r\n                        {\r\n                            \"name :\": \"Altezza esterna 3172\",\r\n                            \"description :\": \"Altezza esterna 3172<br>\",\r\n                            \"position :\": 1,\r\n                            \"fileUrl :\": \"\"\r\n                        },\r\n                        {\r\n                            \"name :\": \"Lunghezza esterna 6916\",\r\n                            \"description :\": \"Lunghezza esterna 6916<br>\",\r\n                            \"position :\": 2,\r\n                            \"fileUrl :\": \"\"\r\n                        },\r\n                        {\r\n                            \"name :\": \"Larghezza esterna 2300\",\r\n                            \"description :\": \"Larghezza esterna 2300<br>\",\r\n                            \"position :\": 3,\r\n                            \"fileUrl :\": \"\"\r\n                        },\r\n                        {\r\n                            \"name :\": \"Altezza interna 2000\",\r\n                            \"description :\": \"Altezza interna 2000<br>\",\r\n                            \"position :\": 4,\r\n                            \"fileUrl :\": \"\"\r\n                        },\r\n                        {\r\n                            \"name :\": \"Lunghezza interna 4200\",\r\n                            \"description :\": \"Lunghezza interna 4200<br>\",\r\n                            \"position :\": 5,\r\n                            \"fileUrl :\": \"\"\r\n                        },\r\n                        {\r\n                            \"name :\": \"Larghezza interna 2050\",\r\n                            \"description :\": \"Larghezza interna 2050<br>\",\r\n                            \"position :\": 6,\r\n                            \"fileUrl :\": \"\"\r\n                        },\r\n                        {\r\n                            \"name :\": \"Portata da 440 a 600 kg\",\r\n                            \"description :\": \"Portata da 440 a 600 kg<br>\",\r\n                            \"position :\": 7,\r\n                            \"fileUrl :\": \"\"\r\n                        },\r\n                        {\r\n                            \"name :\": \"Dicitura 3\",\r\n                            \"description :\": \"<br>Se per il tuo trasporto necessiti una portata specifica ti invitiamo a contattare le nostre filiali.\",\r\n                            \"position :\": 10,\r\n                            \"fileUrl :\": \"\"\r\n                        }\r\n                    ],\r\n                    \"vehicleExtraImage\": [],\r\n                    \"groupPic\": {\r\n                        \"id\": 72,\r\n       ..........
+  /api/v1/touroperator/bookings:
+    post:
+      summary: create reservation
+      description: Create reservation
+      parameters:
+        - name: tokenValue
+          in: header
+          schema:
+            type: string
+          example: a2f47f7d727cb7c3a9d7321cc69e6004
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                dropOffLocation:
+                  type: string
+                  description: 'Drop off location'
+                youngDriverFee:
+                  type: integer
+                  example : 80.0
+                seniorDriverFee:
+                  type: integer
+                  example : 0.0
+                seniorDriverFeeDesc:
+                  type: string
+                  example: ""
+                youngDriverFeeDesc:
+                  type: string
+                  example: "YOUNG DRIVER 19 - 23"
+                VehicleCode:
+                  type: string
+                  description: ' vehicle code'
+                optionals:
+                  type: object
+                  description: 'list of optionals having Equip Type/optional code, number of quantity, Selected false/true and isPrepaid false/true '
+                endDate:
+                  type: string
+                  description: 'End date of booking '
+                CompanyInfo:
+                  type: object
+                  properties:
+                    CompanyPhoneNumber:
+                      type: string
+                      example : '1234567890'
+                    CompanyEmail:
+                      type: string
+                      example : 'adefr@gamil.com'
+                    CompanyEInvoicingCode:
+                      type: string
+                      example : 'afaf4'
+                    CompanyEInvoicingEmail:
+                      type: string
+                      example : 'ashubacchan@gamil.com'
+                    CompanyBirthDate:
+                      type: string
+                      example : '1955-02-24T11:06:22.000Z'
+                    CompanyBirthCity:
+                      type: string
+                      example : 'ABBADIA LARIANA'
+                    CompanyBirthProv:
+                      type: string
+                      example : 'fa'
+                    CompanyBirthCountry:
+                      type: string
+                      example : 'ITALIA'
+                    CompanyStreet:
+                      type: string
+                      example : 'afa'
+                    CompanyStreetNumber:
+                      type: string
+                      example : '4566544'
+                    CompanyCityName:
+                      type: string
+                      example : 'ABBADIA LARIANA'
+                    CompanyPostalCode:
+                      type: string
+                      example : '35031'
+                    CompanyStateProv:
+                      type: string
+                      example : 'fa'
+                    CompanyCountry:
+                      type: string
+                      example : 'ITALIA'
+                    CompanyName:
+                      type: string
+                      example : 'adadf'
+                Customer:
+                  type: object
+                  properties:
+                    Surname:
+                      type: string
+                      description: 'client last name/ surname '
+                    Name:
+                      type: string
+                      description: ' client first name '
+                    clientId:
+                      type: string
+                      description : 'if client alraedy created than send client id'
+                    firstName:
+                      type: string
+                      description: 'First name of the customer'
+                      example : 'test'
+                    lastName:
+                      type: string
+                      description: 'Last name of the customer'
+                      example : 'test'
+                    ragioneSociale:
+                      type: string
+                      description: 'Comapny Name'
+                      example : 'test'
+                    codice:
+                      type: string
+                      description: 'Code of the customer'
+                      example : 'test'
+                    street:
+                      type: string
+                      description: 'Street'
+                      example : 'test'
+                    num:
+                      type: string
+                      description: 'Number'
+                      example : 'test'
+                    city:
+                      type: string
+                      description: 'City'
+                      example : 'test'
+                    zip:
+                      type: string
+                      description: 'Zip code'
+                      example : '12345'
+                    country:
+                      type: string
+                      description: 'Country'
+                      example : 'ITALIA'
+                    state:
+                      type: string
+                      description: 'State'
+                      example : 'test'
+                    phNum1:
+                      type: string
+                      description: 'Phone number of the customer'
+                      example : '23412345'
+                    phNum2:
+                      type: string
+                      description: 'Phone number of the customer'
+                      example : '345234555'
+                    mobileNumber:
+                      type: string
+                      description: 'Mobile number of the customer'
+                      example : '1234555'
+                    email:
+                      type: string
+                      description: 'Email of the customer'
+                      example : 'test@test.com'
+                    vatNumber:
+                      type: string
+                      description: 'Vat number'
+                      example : 'test'
+                    birthPlace:
+                      type: string
+                      description: 'birth place of the customer'
+                      example : 'Polverigi'
+                    birthDate:
+                      type: string
+                      description: 'bith date of the customer'
+                      example : '1980-12-26'
+                    birthProvince:
+                      type: string
+                      description: 'Birth Province of the customer'
+                      example : 'test'
+                    birthNation:
+                      type: string
+                      example : 'test'
+                    gender:
+                      type: boolean
+                      description: 'true->Male, false->Female'
+                      example : true
+                    taxCode:
+                      type: string
+                      example : 'test'
+                    document:
+                      type: string
+                      description: 'Documnet type'
+                      example : 'PATENT'
+                    documentNumber:
+                      type: string
+                      example : '1234555'
+                    licenceType:
+                      type: string
+                      example : 'test'
+                    issueBy:
+                      type: string
+                      example : 'test'
+                    releaseDate:
+                      type: string
+                      example : '1999-12-01'
+                    expiryDate:
+                      type: string
+                      example : '2030-12-01'
+                    eInvoiceEmail:
+                      type: string
+                      example : 'test'
+                    eInvoiceCode:
+                      type: string
+                      example : 'test'
+                    isPhysicalPerson:
+                      type: string
+                      description: 'Is physical person Or Legal Entity'
+                      example : 'true'
+                    isIndividualCompany:
+                      type: string
+                      description: 'Is physical person Or Legal Entity'
+                      example : 'false'
+                Fee:
+                  type: object
+                  properties:
+                    CurrencyCode:
+                      type: string
+                      description: 'Currency code fee '
+                    Description:
+                      type: string
+                      description : ' description of fee '
+                    Amount:
+                      type: string
+                      description: ' fee amount '
+                pickupLocation:
+                  type: string
+                  description: 'pickup location '
+                VehicleRequest:
+                  type: object
+                  properties:
+                    PaymentType:
+                      type: string
+                      description : '---3BONIFICO---3 >>meaning payment will be done via wire transfer\n
+                         ---3PayPal---3 :- meaning payment via PayPal.\n
+                         ---3CREDITCARDDEFERRED---3 meaning payment will be via differed credit card.\n
+                         ---3CUSTOMCREDITCARD---3 meaning payment will be via credit card'
+                    type:
+                      type: string
+                    PaymentAmount:
+                      type: number
+                      description: 'payment amount '
+                    PaymentTransactionTypeCode:
+                      type: string
+                      description: 'type of paymentType tranaction code '
+                startDate:
+                  type: string
+                  description: 'booking start Date'
+                channel:
+                  type: string
+                  description: ' price list code'
+                onlineUser:
+                  type: integer
+                  description: ''
+                insuranceId:
+                  type: integer
+                  description: ''
+                  example: 1
+                agreementCoupon:
+                  type: string
+                  description: 'Coupon'
+                  example : 'ABCD'
+                TransactionStatusCode:
+                  type: string
+                  description: 'Transaction Status Code'
+                  example : '10'
+                PayNowDis:
+                  type: string
+                  description: 'Used for booking discount'
+                  example : '5'
+                isYoungDriverAge:
+                  type: boolean
+                  description: ''
+                  example : true
+                isSeniorDriverAge:
+                  type: boolean
+                  description: ''
+                  example : true
+
+            examples:
+              '0':
+                value: {
+                          "startDate" : "2022-02-16T11:00:00",
+                          "endDate" : "2022-02-17T11:00:00",
+                          "pickupLocation" : "MXP",
+                          "dropOffLocation" : "FLR",
+                          "Customer" : {
+                            "Name" : "Shivangani",
+                            "Surname" : "Tandon",
+                            "clientId" : "18946",
+                            "ragioneSociale": null,
+                            "codice": null,
+                            "street": "VIA DOSSELLI",
+                            "num": "17",
+                            "city": "LUMEZZANE",
+                            "zip": "25065",
+                            "country": "ITALIA",
+                            "state": "BS",
+                            "phNum1": "3890460257",
+                            "phNum2": null,
+                            "mobileNumber": "3890469000",
+                            "email": null,
+                            "vatNumber": null,
+                            "birthPlace": "BRESCIA",
+                            "birthDate": "1980-12-16",
+                            "birthProvince": "BS",
+                            "birthNation": "ITALIA",
+                            "gender": true,
+                            "taxCode": "CRDDNL80T16B157F",
+                            "document": "PATENTE",
+                            "documentNumber": "BS5149982Y",
+                            "licenceType": "B",
+                            "issueBy": "MCTC BS",
+                            "releaseDate": "1999-12-01",
+                            "expiryDate": "2029-12-03",
+                            "eInvoiceEmail": "test",
+                            "eInvoiceCode": "test2"
+                          },
+                          "VehicleCode" : "A",
+                          "optionals": [
+                            {
+                              "EquipType": "GOLD",
+                              "Quantity": "1",
+                              "Selected": true,
+                              "Prepaid": false
+                            },
+                            {
+                              "EquipType": "BABY",
+                              "Quantity": "1",
+                              "Selected": true,
+                              "Prepaid": false
+                            }
+                          ],
+                          "Fee": {
+                            "Amount": "",
+                            "CurrencyCode": "EUR",
+                            "Description": "ADDITIONAL DRIVER (ADDITIONAL DRIVER)"
+                          },
+                          "VehicleRequest": {
+                            "PaymentTransactionTypeCode": "charge",
+                            "PaymentType": "---3BONIFICO---3",
+                            "type": "Payment",
+                            "PaymentAmount": 40,
+                            "VoucherNumber": "TEST"
+                          },
+                          "channel": "WEB001",
+                          "onlineUser": 9,
+                          ""
+                        }
+              '1':
+                value: "{\r\n  \"endDate\": \"2022-12-06T15:00:00\",\r\n  \"startDate\": \"2022-12-06T08:00:00\",\r\n  \"pickupLocation\": \"FCO\",\r\n  \"dropOffLocation\": \"FCO\",\r\n  \"Customer\": {\r\n    \"Name\": \"Shivangani\",\r\n    \"Surname\": \"Tandon\",\r\n    \"clientId\": \"18946\",\r\n    \"ragioneSociale\": null,\r\n    \"codice\": null,\r\n    \"street\": \"VIA DOSSELLI\",\r\n    \"num\": \"17\",\r\n    \"city\": \"LUMEZZANE\",\r\n    \"zip\": \"25065\",\r\n    \"country\": \"ITALIA\",\r\n    \"state\": \"BS\",\r\n    \"phNum1\": \"3890460257\",\r\n    \"phNum2\": null,\r\n    \"mobileNumber\": \"3890469000\",\r\n    \"email\": \"sachin.vinay@gmail.com\",\r\n    \"vatNumber\": null,\r\n    \"birthPlace\": \"BRESCIA\",\r\n    \"birthDate\": \"1980-12-16\",\r\n    \"birthProvince\": \"BS\",\r\n    \"birthNation\": \"ITALIA\",\r\n    \"gender\": true,\r\n    \"taxCode\": \"CRDDNL80T16B157F\",\r\n    \"document\": \"PATENTE\",\r\n    \"documentNumber\": \"BS5149982Y\",\r\n    \"licenceType\": \"B\",\r\n    \"issueBy\": \"MCTC BS\",\r\n    \"releaseDate\": \"1999-12-01\",\r\n    \"expiryDate\": \"2029-12-03\",\r\n    \"eInvoiceEmail\": \"test\",\r\n    \"eInvoiceCode\": \"test2\"\r\n  },\r\n  \"VehicleCode\": \"K\",\r\n  \"optionals\": [\r\n    {\r\n      \"EquipType\": \"GOLD\",\r\n      \"Quantity\": \"1\",\r\n      \"Selected\": true,\r\n      \"Prepaid\": false\r\n    },\r\n    {\r\n      \"EquipType\": \"BABY\",\r\n      \"Quantity\": \"1\",\r\n      \"Selected\": true,\r\n      \"Prepaid\": false\r\n    }\r\n  ],\r\n  \"Fee\": {\r\n    \"Amount\": \"\",\r\n    \"CurrencyCode\": \"EUR\",\r\n    \"Description\": \"ADDITIONAL DRIVER (ADDITIONAL DRIVER)\"\r\n  },\r\n  \"VehicleRequest\": {\r\n    \"PaymentTransactionTypeCode\": \"charge\",\r\n    \"PaymentType\": \"---3BONIFICO---3\",\r\n    \"type\": \"Payment\",\r\n    \"PaymentAmount\": 40,\r\n    \"VoucherNumber\": \"TEST\"\r\n  },\r\n  \"channel\": \"WEB001\",\r\n  \"onlineUser\": 9,\r\n \"agreementCoupon\":\"ABCD\",\r\n \"discountValueWithoutVat\":\"10\",\r\n \"PayNowDis\":\"10\"r\n}"
+              '2':
+                value: "{\r\n  \"endDate\": \"2022-12-06T15:00:00\",\r\n  \"startDate\": \"2022-12-06T08:00:00\",\r\n  \"pickupLocation\": \"FCO\",\r\n  \"dropOffLocation\": \"FCO\",\r\n  \"Customer\": {\r\n    \"Name\": \"Shivangani\",\r\n    \"Surname\": \"Tandon\",\r\n    \"clientId\": \"18946\",\r\n    \"ragioneSociale\": null,\r\n    \"codice\": null,\r\n    \"street\": \"VIA DOSSELLI\",\r\n    \"num\": \"17\",\r\n    \"city\": \"LUMEZZANE\",\r\n    \"zip\": \"25065\",\r\n    \"country\": \"ITALIA\",\r\n    \"state\": \"BS\",\r\n    \"phNum1\": \"3890460257\",\r\n    \"phNum2\": null,\r\n    \"mobileNumber\": \"3890469000\",\r\n    \"email\": \"sachin.vinay@gmail.com\",\r\n    \"vatNumber\": null,\r\n    \"birthPlace\": \"BRESCIA\",\r\n    \"birthDate\": \"1980-12-16\",\r\n    \"birthProvince\": \"BS\",\r\n    \"birthNation\": \"ITALIA\",\r\n    \"gender\": true,\r\n    \"taxCode\": \"CRDDNL80T16B157F\",\r\n    \"document\": \"PATENTE\",\r\n    \"documentNumber\": \"BS5149982Y\",\r\n    \"licenceType\": \"B\",\r\n    \"issueBy\": \"MCTC BS\",\r\n    \"releaseDate\": \"1999-12-01\",\r\n    \"expiryDate\": \"2029-12-03\",\r\n    \"eInvoiceEmail\": \"test\",\r\n    \"eInvoiceCode\": \"test2\"\r\n  },\r\n  \"VehicleCode\": \"K\",\r\n  \"optionals\": [\r\n    {\r\n      \"EquipType\": \"GOLD\",\r\n      \"Quantity\": \"1\",\r\n      \"Selected\": true,\r\n      \"Prepaid\": false\r\n    },\r\n    {\r\n      \"EquipType\": \"BABY\",\r\n      \"Quantity\": \"1\",\r\n      \"Selected\": true,\r\n      \"Prepaid\": false\r\n    }\r\n  ],\r\n  \"Fee\": {\r\n    \"Amount\": \"\",\r\n    \"CurrencyCode\": \"EUR\",\r\n    \"Description\": \"ADDITIONAL DRIVER (ADDITIONAL DRIVER)\"\r\n  },\r\n  \"VehicleRequest\": {\r\n    \"PaymentTransactionTypeCode\": \"charge\",\r\n    \"PaymentType\": \"---3BONIFICO---3\",\r\n    \"type\": \"Payment\",\r\n    \"PaymentAmount\": 40,\r\n    \"VoucherNumber\": \"TEST\"\r\n  },\r\n  \"channel\": \"WEB001\",\r\n  \"onlineUser\": 9,\r\n \"agreementCoupon\":\"ABCD\",\r\n \"discountValueWithoutVat\":\"10\",\r\n \"PayNowDis\":\"10\"\r\n}"
+              '3':
+                value: "{\r\n  \"endDate\": \"2023-05-08T10:00:00\",\r\n  \"startDate\": \"2023-05-06T10:00:00\",\r\n  \"pickupLocation\": \"PMO100\",\r\n  \"dropOffLocation\": \"PMO100\",\r\n  \"Customer\": {\r\n    \"Name\": \"Shivangani\",\r\n    \"Surname\": \"Tandon\",\r\n    \"clientId\": \"47335\",\r\n    \"ragioneSociale\": null,\r\n    \"codice\": null,\r\n    \"street\": \"VIA DOSSELLI\",\r\n    \"num\": \"17\",\r\n    \"city\": \"LUMEZZANE\",\r\n    \"zip\": \"25065\",\r\n    \"country\": \"ITALIA\",\r\n    \"state\": \"BS\",\r\n    \"phNum1\": \"3890460257\",\r\n    \"phNum2\": null,\r\n    \"mobileNumber\": \"3890469000\",\r\n    \"email\": \"sachin.vinay@gmail.com\",\r\n    \"vatNumber\": null,\r\n    \"birthPlace\": \"BRESCIA\",\r\n    \"birthDate\": \"1980-12-16\",\r\n    \"birthProvince\": \"BS\",\r\n    \"birthNation\": \"ITALIA\",\r\n    \"gender\": true,\r\n    \"taxCode\": \"CRDDNL80T16B157F\",\r\n    \"document\": \"PATENTE\",\r\n    \"documentNumber\": \"BS5149982Y\",\r\n    \"licenceType\": \"B\",\r\n    \"issueBy\": \"MCTC BS\",\r\n    \"releaseDate\": \"1999-12-01\",\r\n    \"expiryDate\": \"2029-12-03\",\r\n    \"eInvoiceEmail\": \"test\",\r\n    \"eInvoiceCode\": \"test2\"\r\n  },\r\n  \"VehicleCode\": \"HDMR\",\r\n  \"optionals\": [\r\n    {\r\n      \"EquipType\": \"GOLD\",\r\n      \"Quantity\": \"1\",\r\n      \"Selected\": true,\r\n      \"Prepaid\": false\r\n    },\r\n    {\r\n      \"EquipType\": \"BABY\",\r\n      \"Quantity\": \"1\",\r\n      \"Selected\": true,\r\n      \"Prepaid\": false\r\n    }\r\n  ],\r\n  \"Fee\": {\r\n    \"Amount\": \"\",\r\n    \"CurrencyCode\": \"EUR\",\r\n    \"Description\": \"ADDITIONAL DRIVER (ADDITIONAL DRIVER)\"\r\n  },\r\n  \"VehicleRequest\": {\r\n    \"PaymentTransactionTypeCode\": \"charge\",\r\n    \"PaymentType\": \"---3BONIFICO---3\",\r\n    \"type\": \"Payment\",\r\n    \"PaymentAmount\": 40,\r\n    \"VoucherNumber\": \"TEST\"\r\n  },\r\n  \"channel\": \"WEB001\",\r\n   \"isYoungDriverAge\": true,\r\n  \"isSeniorDriverAge\": false,\r\n  \"noFeeAge\":false\r\n}"
+              '4':
+                value: "{\r\n  \"startDate\": \"2023-04-25T08:00:00\",\r\n  \"endDate\": \"2023-04-30T08:00:00\",\r\n  \"pickupLocation\": \"AHO100\",\r\n  \"dropOffLocation\": \"AHO100\",\r\n  \"CompanyInfo\": {\r\n        \"CompanyPhoneNumber\": \"1234567890\",\r\n        \"CompanyEmail\": \"adefr@gamil.com\",\r\n        \"CompanyEInvoicingCode\": \"afaf4\",\r\n        \"CompanyEInvoicingEmail\": \"ashubacchan@gamil.com\",\r\n        \"CompanyBirthDate\": \"1955-02-24T11:06:22.000Z\",\r\n        \"CompanyBirthCity\": \"ABBADIA LARIANA\",\r\n        \"CompanyBirthProv\": \"fa\",\r\n        \"CompanyBirthCountry\": \"ITALIA\",\r\n        \"CompanyStreet\": \"afa\",\r\n        \"CompanyStreetNumber\": \"4566544\",\r\n        \"CompanyCityName\": \"ABBADIA LARIANA\",\r\n        \"CompanyPostalCode\": \"35031\",\r\n        \"CompanyStateProv\": \"fa\",\r\n        \"CompanyCountry\": \"ITALIA\",\r\n        \"CompanyName\": \"adadf\"\r\n    },\r\n    \"youngDriverFee\": 80.0,\r\n    \"seniorDriverFee\": 0.0,\r\n    \"seniorDriverFeeDesc\": \"\",\r\n    \"youngDriverFeeDesc\": \"YOUNG DRIVER 19 - 23\",\r\n    \"isYoungDriverAge\": \"true\",\r\n    \"isSeniorDriverAge\": \"false\",\r\n    \"noFeeAge\": \"false\",\r\n    \"Customer\": {\r\n    \"Name\": \"Shivangani\",\r\n    \"Surname\": \"Tandon\",\r\n    \"clientId\": \"18946\",\r\n    \"ragioneSociale\": null,\r\n    \"codice\": null,\r\n    \"street\": \"VIA DOSSELLI\",\r\n    \"num\": \"17\",\r\n    \"city\": \"LUMEZZANE\",\r\n    \"zip\": \"25065\",\r\n    \"country\": \"ITALIA\",\r\n    \"state\": \"BS\",\r\n    \"phNum1\": \"3890460257\",\r\n    \"phNum2\": null,\r\n    \"mobileNumber\": \"3890469000\",\r\n    \"email\": null,\r\n    \"vatNumber\": null,\r\n    \"birthPlace\": \"BRESCIA\",\r\n    \"birthDate\": \"1980-12-16\",\r\n    \"birthProvince\": \"BS\",\r\n    \"birthNation\": \"ITALIA\",\r\n    \"gender\": true,\r\n    \"taxCode\": \"CRDDNL80T16B157F\",\r\n    \"document\": \"PATENTE\",\r\n    \"documentNumber\": \"BS5149982Y\",\r\n    \"licenceType\": \"B\",\r\n    \"issueBy\": \"MCTC BS\",\r\n    \"releaseDate\": \"1999-12-01\",\r\n    \"expiryDate\": \"2029-12-03\",\r\n    \"eInvoiceEmail\": \"test\",\r\n    \"eInvoiceCode\": \"test2\"\r\n  },\r\n  \"VehicleCode\": \"EDMR\",\r\n  \"optionals\": [\r\n    {\r\n      \"EquipType\": \"GOLD\",\r\n      \"Quantity\": \"1\",\r\n      \"Selected\": true,\r\n      \"Prepaid\": false\r\n    },\r\n    {\r\n      \"EquipType\": \"BABY\",\r\n      \"Quantity\": \"1\",\r\n      \"Selected\": true,\r\n      \"Prepaid\": false\r\n    }\r\n  ],\r\n  \"Fee\": {\r\n    \"Amount\": \"\",\r\n    \"CurrencyCode\": \"EUR\",\r\n    \"Description\": \"ADDITIONAL DRIVER (ADDITIONAL DRIVER)\"\r\n  },\r\n  \"VehicleRequest\": {\r\n    \"PaymentTransactionTypeCode\": \"charge\",\r\n    \"PaymentType\": \"---3BONIFICO---3\",\r\n    \"type\": \"Payment\",\r\n    \"PaymentAmount\": 40,\r\n    \"VoucherNumber\": \"TEST\"\r\n  },\r\n  \"channel\": \"WEB001\"\r\n}"
+
+
+      responses:
+        '200':
+          description: ok
+          content:
+            application/json:
+              schema:
+                type: object
+                $ref: '#/components/schemas/BookingResponse'
+
+  /api/v1/touroperator/payments:
+    post:
+      summary:  Payment methods
+      description : all payment methods for Booking
+      parameters:
+        - name: tokenValue
+          in: header
+          required: true
+          schema:
+            type: string
+            example: "8f9860c8952e1325ae887bd6a68e7187"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                language:
+                  type: string
+                  description: 'en/it'
+      responses:
+        '200':
+          description: Get all payment methods for Booking
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  wireTransfer:
+                    type: object
+                  paypal:
+                    type: object
+                    properties:
+                      sandboxEmailCompany:
+                        type: string
+                      sandboxPaymentURL:
+                        type: string
+                      sandboxReturnURL:
+                        type: string
+                      sandboxNotifyURL:
+                        type: string
+                      sandboxCancelURL:
+                        type: string
+                      developmentMode:
+                        type: string
+                      productionEmailCompany:
+                        type: string
+                      productionPaymentURL:
+                        type: string
+                      productionReturnURL:
+                        type: string
+                      productionNotifyURL:
+                        type: string
+                      productionCancelURL:
+                        type: string
+                      dateCreated:
+                        type: string
+                      lastUpdated:
+                        type: string
+                      currencyCode:
+                        type: string
+                  Nexi:
+                    type: object
+                    properties:
+                      fieldType:
+                        type: string
+                      fieldName:
+                        type: string
+                      fieldAction:
+                        type: string
+                      fieldValue:
+                        type: string
+                      fieldId:
+                        type: string
+                      customAttribute1:
+                        type: string
+                      customAttribute2:
+                        type: string
+                      customAttribute3:
+                        type: string
+                      dateCreated:
+                        type: string
+                      lastUpdated:
+                        type: string
+              examples:
+                '0':
+                  value: "{\r\n    \"paypal\": [\r\n        {\r\n            \"sandboxEmailCompany\": \"shiv.tandon16-facilitator@gmail.com\",\r\n            \"sandboxPaymentURL\": \"https://www.sandbox.paypal.com/cgi-bin/webscr\",\r\n            \"sandboxReturnURL\": \"\",\r\n            \"sandboxNotifyURL\": \"\",\r\n            \"sandboxCancelURL\": \"\",\r\n            \"developmentMode\": false,\r\n            \"productionEmailCompany\": \"paypal@testee.it\",\r\n            \"productionPaymentURL\": \"https://www.paypal.com/cgi-bin/webscr\",\r\n            \"productionReturnURL\": \"\",\r\n            \"productionNotifyURL\": \"\",\r\n            \"productionCancelURL\": \"\",\r\n            \"dateCreated\": \"2022-09-27T05:00:55Z\",\r\n            \"lastUpdated\": \"2022-09-27T05:00:55Z\",\r\n            \"currencyCode\": {\r\n                \"class\": \"com.dogmasystems.myrent.db.MRCurrency\",\r\n                \"id\": null,\r\n                \"code\": \"EUR\",\r\n                \"createDate\": \"2018-09-24T11:13:40Z\",\r\n                \"createdBy\": {\r\n                    \"class\": \"com.dogmasystems.myrent.db.MRUser\",\r\n                    \"id\": 1\r\n                },\r\n                \"description\": \"Euros\",\r\n                \"enabled\": true,\r\n                \"isDefault\": true,\r\n                \"isEnableForBooking\": null,\r\n                \"lastModifyBy\": {\r\n                    \"class\": \"com.dogmasystems.myrent.db.MRUser\",\r\n                    \"id\": 1\r\n                },\r\n                \"modifyDate\": \"2018-09-24T11:13:40Z\"\r\n            },\r\n            \"Paypallable\": \"Pay with PayPal\"\r\n        }\r\n    ],\r\n    \"stripe\": {\r\n        \"StripeKey\": null,\r\n        \"StripeLabel\": \"PAYPAL\"\r\n    },\r\n    \"Nexi\": [\r\n        {\r\n            \"fieldType\": \"form\",\r\n            \"fieldName\": \"formNexi\",\r\n            \"fieldAction\": \"\",\r\n            \"fieldValue\": \"development\",\r\n            \"fieldId\": \"\",\r\n            \"customAttribute1\": \"\",\r\n            \"customAttribute2\": \"\",\r\n            \"customAttribute3\": \"\",\r\n            \"dateCreated\": \"2022-11-15T01:30:37Z\",\r\n            \"lastUpdated\": \"2022-11-15T01:30:37Z\",\r\n            \"NexiLabel\": \"CREDIT CARD\"\r\n        }\r\n    ]\r\n}"
+
+  /api/v1/touroperator/booking/getConfiguration:
+    get:
+      summary:  get Configuration
+      description : get logo,backgroundImage,cssFile,headerFile and FooterFile url
+      parameters:
+        - name: tokenValue
+          in: header
+          required: true
+          schema:
+            type: string
+            example: "5094bd3060c4f07e2da8ccc67ee3b2e4"
+
+      responses:
+        '200':
+          description: get logo,backgroundImage,cssFile,headerFile and FooterFile url
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  logoUrl:
+                    type: string
+                  backgroundImageUrl:
+                    type: string
+                  cssFileUrl:
+                    type: string
+                  headerFileUrl:
+                    type: string
+                  footerFileUrl:
+                    type: string
+              examples:
+                '0':
+                  value: "{\r\n    \"logoUrl\": \"http:\/\/dogmasystems.test.booking.india.s3.amazonaws.com\/test\/image\/logo0.png\",\r\n    \"backgroundImageUrl\": \"http:\/\/dogmasystems.test.booking.india.s3.amazonaws.com\/test\/image\/banner-2.jpg\",\r\n    \"cssFileUrl\": \"\",\r\n    \"headerFileUrl\": \"\",\r\n    \"footerFileUrl\": \"\"\r\n}"
+
+  /api/v1/booking/getHeaderAndFooter:
+    get:
+      summary: CDN Url for header and footer
+      description:  CDN Url for header and footer
+      parameters:
+        - name: tokenValue
+          in: header
+          schema:
+            type: string
+            example: a2f47f7d727cb7c3a9d7321cc69e6004
+      responses:
+        200:
+          description: Get CDN Url for header and footer
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  headerUrl:
+                    type: string
+                  footerUrl:
+                    type: string
+              examples:
+                '0':
+                  value: "{\r\n    \"headerUrl\": null,\r\n    \"footerUrl\": \"https://jjkkll\"\r\n}"
+  /api/v1/booking/getBookingSetting:
+    get:
+      summary: find details of bookingSetting
+      description:  find details of bookingSetting
+      parameters:
+        - name: tokenValue
+          in: header
+          schema:
+            type: string
+            example: a2f47f7d727cb7c3a9d7321cc69e6004
+      responses:
+        200:
+          description: Get details of bookingSettings
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  bookingTitle:
+                    type: string
+                  websiteUrl:
+                    type: string
+                  maxRentalDurationInDays:
+                    type: string
+                  minLeadTimeInHours:
+                    type: string
+                  minRentDays:
+                    type: string
+                  minDaysDiscountTwoPrices:
+                    type: string
+                  defaultCurrency:
+                    type: string
+                  checkLocationVehicleAvailability:
+                    type: boolean
+                  checkVehicleAvailability:
+                    type: boolean
+                  googleAnalyticsCode:
+                    type: string
+                  imagePath:
+                    type: string
+                  defaultPupTime:
+                    type: string
+                  defaultDoffTime:
+                    type: string
+                  locationReturnEnable:
+                    type: boolean
+                  noSabatoDomenica:
+                    type: boolean
+                  viewGroupNotavailable:
+                    type: boolean
+                  viewAlertGroupNotAvailable:
+                    type: boolean
+                  flightNumber:
+                    type: boolean
+                  noOneWayToAllLocation:
+                    type: boolean
+                  textAreaPrivacyCondition1:
+                    type: boolean
+                  textAreaPrivacyCondition2:
+                    type: boolean
+                  downloadPrivacyCondition:
+                    type: boolean
+                  imageGroupText:
+                    type: boolean
+                  displayHeader:
+                    type: boolean
+                  useDefaultTime:
+                    type: boolean
+                  verticalCreditCardForm:
+                    type: boolean
+                  noPrices:
+                    type: boolean
+                  twoPrices:
+                    type: boolean
+                  passengersData:
+                    type: boolean
+                  locationData:
+                    type: boolean
+                  additionalInfoField:
+                    type: boolean
+                  groupDescription:
+                    type: boolean
+                  optionalDescription:
+                    type: boolean
+                  groupVehicleParameter:
+                    type: boolean
+                  customPayment:
+                    type: boolean
+                  noSelPayment:
+                    type: boolean
+                  headerAndFooter:
+                    type: boolean
+                  externalLinkStep0:
+                    type: boolean
+                  showMacroGroupSelection:
+                    type: boolean
+                  showReservationGroupSelection:
+                    type: boolean
+                  showWebCodeInput:
+                    type: boolean
+                  hideGroupDescription:
+                    type: boolean
+                  hideDuplicateGroupCategory:
+                    type: boolean
+                  hideDiscountValue:
+                    type: boolean
+                  noSunday:
+                    type: boolean
+                  showGroupDropDown:
+                    type: boolean
+                  tourOperatorField:
+                    type: boolean
+                  testCheck:
+                    type: boolean
+                  testAddress:
+                    type: boolean
+                  noPrivacyCheckTo:
+                    type: boolean
+                  dateCreated:
+                    type: string
+                  lastUpdated:
+                    type: string
+                  automaticInvoiceFields:
+                    type: boolean
+                  donotShowInvoiceFields:
+                    type: boolean
+                  invoiceUrl:
+                    type: string
+                  allowBookingForOnRequestGroups:
+                    type: boolean
+                  showCustomerDataFirst:
+                    type: boolean
+                  showOnePayMethodTwoPrice:
+                    type: boolean
+                  redirectToHomePage:
+                    type: boolean
+                  redirectUrl:
+                    type: boolean
+                  isDownloadReq:
+                    type: boolean
+                  isAttachTNC:
+                    type: boolean
+                  isAttachePrivacy:
+                    type: boolean
+                  enableConfirmEmail:
+                    type: boolean
+                  showLicenseField:
+                    type: boolean
+                  showInIframe:
+                    type: boolean
+                  showAmountInCurrency:
+                    type: boolean
+                  showMultiCurrency:
+                    type: boolean
+                  useBookingLang:
+                    type: boolean
+                  enableTagManager:
+                    type: boolean
+                  tagManagerId:
+                    type: string
+                  showPaymentBoxFirst:
+                    type: boolean
+                  showCity:
+                    type: boolean
+                  showStreet:
+                    type: boolean
+                  showZip:
+                    type: boolean
+                  showCountry:
+                    type: boolean
+                  showOutOfHourMsg:
+                    type: boolean
+                  cancelEmailTo:
+                    type: string
+                  sendCancelEmail:
+                    type: boolean
+                  createCancelFeeInvoice:
+                    type: boolean
+                  sortVehicleListByPrice:
+                    type: boolean
+                  sortVehicleListByAvailability:
+                    type: boolean
+                  donotShowContractCondition:
+                    type: boolean
+                  showPassportField:
+                    type: boolean
+                  showNewPrivacyCheck:
+                    type: boolean
+                  showExtrasNote:
+                    type: boolean
+                  restrictOptionalQuantity:
+                    type: boolean
+                  bookingSetUp:
+                    type: boolean
+                  sortVehByNationalCode:
+                    type: boolean
+                  sortVehByInterNationalCode:
+                    type: boolean
+                  applyDiscWholeRate:
+                    type: boolean
+                  enableFilterAvailUnAvail:
+                    type: boolean
+                  enableFilterByFuel:
+                    type: boolean
+                  enableFilterByType:
+                    type: boolean
+                  enableFilterByMacro:
+                    type: boolean
+                  enableFilterBySeat:
+                    type: boolean
+                  selfService:
+                    type: boolean
+                  reservedArea:
+                    type: boolean
+                  webCheckIn:
+                    type: boolean
+                  booking:
+                    type: boolean
+                  onrequestPayAmount:
+                    type: boolean
+
+              examples:
+                '0':
+                  value: "{\r\n    \"bookingTitle\": \"Online Booking\",\r\n    \"websiteUrl\": \"https:\/\/booking.testee.it\/BookingWeb\/\",\r\n    \"maxRentalDurationInDays\": null,\r\n    \"minLeadTimeInHours\": 0,\r\n    \"minRentDays\": 0,\r\n    \"minDaysDiscountTwoPrices\": null,\r\n    \"defaultCurrency\": \"\",\r\n    \"checkLocationVehicleAvailability\": true,\r\n    \"checkVehicleAvailability\": false,\r\n    \"googleAnalyticsCode\": \"GOOOOGL\",\r\n    \"imagePath\": null,\r\n    \"defaultPupTime\": \"08:00\",\r\n    \"defaultDoffTime\": \"08:00\",\r\n    \"locationReturnEnable\": false,\r\n    \"noSabatoDomenica\": false,\r\n    \"viewGroupNotavailable\": false,\r\n    \"viewAlertGroupNotAvailable\": false,\r\n    \"flightNumber\": false,\r\n    \"noOneWayToAllLocation\": false,\r\n    \"textAreaPrivacyCondition1\": true,\r\n    \"textAreaPrivacyCondition2\": false,\r\n    \"downloadPrivacyCondition\": true,\r\n    \"imageGroupText\": false,\r\n    \"displayHeader\": false,\r\n    \"useDefaultTime\": true,\r\n    \"verticalCreditCardForm\": false,\r\n    \"noPrices\": false,\r\n    \"twoPrices\": false,\r\n    \"passengersData\": false,\r\n    \"locationData\": false,\r\n    \"additionalInfoField\": false,\r\n    \"groupDescription\": false,\r\n    \"optionalDescription\": true,\r\n    \"groupVehicleParameter\": true,\r\n    \"customPayment\": true,\r\n    \"noSelPayment\": false,\r\n    \"headerAndFooter\": true,\r\n    \"externalLinkStep0\": \"https:\/\/booking.testee.it\/BookingWeb\/\",\r\n    \"showMacroGroupSelection\": false,\r\n    \"showReservationGroupSelection\": false,\r\n    \"showWebCodeInput\": true,\r\n    \"hideGroupDescription\": false,\r\n    \"hideDuplicateGroupCategory\": false,\r\n    \"hideDiscountValue\": false,\r\n    \"noSunday\": false,\r\n    \"showGroupDropDown\": false,\r\n    \"tourOperatorField\": false,\r\n    \"testCheck\": false,\r\n    \"testAddress\": false,\r\n    \"noPrivacyCheckTo\": false,\r\n    \"dateCreated\": \"2022-01-04T05:14:39Z\",\r\n    \"lastUpdated\": \"2023-03-01T01:47:14Z\",\r\n    \"automaticInvoiceFields\": true,\r\n    \"donotShowInvoiceFields\": false,\r\n    \"invoiceUrl\": \"http:\/\/serverbooking:8080\/MyRentWebTomcat\/InvoiceService\/MyRentWSInvoice\",\r\n    \"allowBookingForOnRequestGroups\": false,\r\n    \"showCustomerDataFirst\": false,\r\n    \"showOnePayMethodTwoPrice\": false,\r\n    \"redirectToHomePage\": true,\r\n    \"redirectUrl\": \"https:\/\/booking.testee.it\/BookingWeb\/bookingFrontend\/\",\r\n    \"isDownloadReq\": false,\r\n    \"isAttachTNC\": true,\r\n    \"isAttachePrivacy\": true,\r\n    \"enableConfirmEmail\": false,\r\n    \"showLicenseField\": false,\r\n    \"showInIframe\": false,\r\n    \"showAmountInCurrency\": false,\r\n    \"showMultiCurrency\": false,\r\n    \"useBookingLang\": true,\r\n    \"enableTagManager\": false,\r\n    \"tagManagerId\": \"\",\r\n    \"showPaymentBoxFirst\": false,\r\n    \"showCity\": false,\r\n    \"showStreet\": false,\r\n    \"showZip\": false,\r\n    \"showCountry\": false,\r\n    \"showOutOfHourMsg\": false,\r\n    \"cancelEmailTo\": \"\",\r\n    \"sendCancelEmail\": false,\r\n    \"createCancelFeeInvoice\": false,\r\n    \"sortVehicleListByPrice\": false,\r\n    \"sortVehicleListByAvailability\": false,\r\n    \"donotShowContractCondition\": false,\r\n    \"showPassportField\": false,\r\n    \"showNewPrivacyCheck\": false,\r\n    \"showExtrasNote\": false,\r\n    \"restrictOptionalQuantity\": false,\r\n    \"bookingSetUp\": true,\r\n    \"sortVehByNationalCode\": false,\r\n    \"sortVehByInterNationalCode\": false,\r\n    \"applyDiscWholeRate\": false,\r\n    \"enableFilterAvailUnAvail\": false,\r\n    \"enableFilterByFuel\": false,\r\n    \"enableFilterByType\": false,\r\n    \"enableFilterByMacro\": false,\r\n    \"enableFilterBySeat\": false,\r\n    \"selfService\": false,\r\n    \"reservedArea\": false,\r\n    \"webCheckIn\": true,\r\n    \"booking\": true,\r\n    \"onrequestPayAmount\": true\r\n}"
+  /api/v1/touroperator/bookings/{bookingId}:
+    get:
+      description : get reservation details by reservation id
+      parameters:
+        - name: tokenValue
+          in: header
+          required: true
+          schema:
+            type: string
+            example: a2f47f7d727cb7c3a9d7321cc69e6004
+        - name: channel
+          in: header
+          required: true
+          schema:
+            type: string
+            example: "WEB001"
+        - name: bookingId
+          in: path
+          required: true
+          schema:
+            type: string
+            example: HQ 46 XXX
+      responses:
+        '200':
+          description: Get Reservation Details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BookingResponse'
+  /api/v1/touroperator/bookings/{bookingId}/cancel:
+    get:
+      summary: cancel reservation
+      description: cancel reservation by reservation id
+      parameters:
+        - name: tokenValue
+          in: header
+          schema:
+            type: string
+          example: a2f47f7d727cb7c3a9d7321cc69e6004
+        - name: channel
+          required: true
+          in: header
+          schema:
+            type: string
+            example: "WEB001"
+        - name: bookingId
+          in: path
+          required: true
+          schema:
+            type: string
+          example: HQ 46 XXX
+      responses:
+        '200':
+          description: Auto generated using Swagger Inspector
+          content:
+            application/json:
+              schema:
+                type: string
+              examples:
+                '0':
+                  value: '{"CancelStatus":"Cancelled","id":"HQ-46-XXX"}'
+        '400':
+          description: (Invalid request) Token is missing
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: "error"
+                  code:
+                    type: integer
+                    example: 400
+                  msg:
+                    type: string
+                    example: "Token is missing"
+        '401':
+          description: (Invalid request) Token is missing
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: "error"
+                  code:
+                    type: integer
+                    example: 401
+                  msg:
+                    type: string
+                    example: "Invalid Token"
+  /api/v1/touroperator/bookings/{bookingId}/status:
+    get:
+      description : get reservation status by reservation id
+      parameters:
+        - name: tokenValue
+          in: header
+          required: true
+          schema:
+            type: string
+            example: a2f47f7d727cb7c3a9d7321cc69e6004
+        - name: bookingId
+          in: path
+          required: true
+          schema:
+            type: string
+            example: HQ 46 XXX
+      responses:
+        '200':
+          description: Get Reservation status
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/statusResponse'
+        '400':
+          description: (Invalid request) Token is missing
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: "error"
+                  code:
+                    type: integer
+                    example: 400
+                  msg:
+                    type: string
+                    example: "Token is missing"
+        '401':
+          description: (Invalid request) Token is missing
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: "error"
+                  code:
+                    type: integer
+                    example: 401
+                  msg:
+                    type: string
+                    example: "Invalid Token"
+  /api/v1/touroperator/bookings/{bookingId}/vehicle:
+    get:
+      description : get reservation details by reservation id
+      parameters:
+        - name: tokenValue
+          in: header
+          required: true
+          schema:
+            type: string
+            example: a2f47f7d727cb7c3a9d7321cc69e6004
+        - name: bookingId
+          in: path
+          required: true
+          schema:
+            type: string
+            example: HQ 46 XXX
+      responses:
+        '200':
+          description: Get Reservation Details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/vehicle'
+        '400':
+          description: (Invalid request) Token is missing
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: "error"
+                  code:
+                    type: integer
+                    example: 400
+                  msg:
+                    type: string
+                    example: "Token is missing"
+        '401':
+          description: (Invalid request) Token is missing
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: "error"
+                  code:
+                    type: integer
+                    example: 401
+                  msg:
+                    type: string
+                    example: "Invalid Token"
+  /api/v1/touroperator/bookings/{bookingInfo}/driver:
+    get:
+      description: 'GET driver details'
+      parameters:
+        - name: tokenValue
+          in: header
+          schema:
+            type: string
+            example: a2f47f7d727cb7c3a9d7321cc69e6004
+        - name: bookingId
+          in: path
+          required: true
+          schema:
+            type: string
+            example: HQ 50 XXX
+      responses:
+        '200':
+          description: get driver details
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  driver:
+                    type: object
+                    properties:
+                      id:
+                        type: integer
+                        example: 10
+                      isPhysicalPerson:
+                        type: boolean
+                        example: true
+                      isClient:
+                        type: boolean
+                        example: true
+                      isDriver:
+                        type: boolean
+                        example: true
+                      name:
+                        type: string
+                        example: 'LUCIANO'
+                      surname:
+                        type: string
+                        example: "DELL'AQUILA"
+                      birthNation:
+                        type: string
+                        example: 'ITALIA'
+                      birthPlace:
+                        type: string
+                        example: 'TOLVE'
+                      birthProv:
+                        type: string
+                        example: 'pz'
+                      gender:
+                        type: boolean
+                        example: true
+                      birthDate:
+                        type: string
+                        example: '1981-01-27'
+                      phoneNumb1:
+                        type: string
+                        example: '391 3682216'
+                      phoneNumb2:
+                        type: string
+                        example: null
+                      taxCode:
+                        type: string
+                        example: 'DLLLCN81A27L197Y'
+                      companyName:
+                        type: string
+                        example: null
+                      releaseDate:
+                        type: string
+                        example: '2012-03-27'
+                      expiryDate:
+                        type: string
+                        example: '2022-05-10'
+                      documentNumb:
+                        type: string
+                        example: 'U1B181271N'
+                      drivingLicense:
+                        type: string
+                        example: 'b'
+                      issueBy:
+                        type: string
+                        example: 'U.C.O'
+                      email:
+                        type: string
+                        example: 'luciano.delaquila1989@gmail.com'
+                      street:
+                        type: string
+                        example: 'via G Garibaldi'
+                      number:
+                        type: integer
+                        example: 13
+                      postalCode:
+                        type: string
+                        example: '21055'
+                      national:
+                        type: string
+                        example: 'ITALIA'
+                      province:
+                        type: string
+                        example: 'VA'
+                      city:
+                        type: string
+                        example: 'GORLA MINORE'
+  /api/v1/touroperator/bookings/{bookingId}/driver:
+    post:
+      description: 'Update driver details'
+      parameters:
+        - name: tokenValue
+          in: header
+          schema:
+            type: string
+          example: a2f47f7d727cb7c3a9d7321cc69e6004
+        - name: bookingId
+          in: path
+          required: true
+          schema:
+            type: string
+            example: HQ 50 XXX
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              $ref: '#/components/schemas/Driver'
+      responses:
+        '200':
+          description: Get Reservation Details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DriverResponse'
+
+  /api/v1/touroperator/bookings/{bookingId}/updateStatus:
+    put:
+      description: 'This reservation service updates the resvation status confirmed'
+      parameters:
+        - name: tokenValue
+          in: header
+          schema:
+            type: string
+            example: a2f47f7d727cb7c3a9d7321cc69e6004
+        - name: bookingId
+          in: path
+          required: true
+          schema:
+            type: string
+            example: HQ 50 XXX
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                id:
+                  type: string
+                  example: 'HQ 50 XXX'
+      responses:
+        '200':
+          description: Get Reservation Details
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string
+                    example: "HQ 50 XXX"
+                  status:
+                    type: string
+                    example: "success"
+
+  /api/v1/touroperator/bookings/{bookingId}/updateData:
+    put:
+      description: 'This reservation service updates the reservation properties'
+      parameters:
+        - name: tokenValue
+          in: header
+          schema:
+            type: string
+            example: a2f47f7d727cb7c3a9d7321cc69e6004
+            description: Authentication token
+        - name: bookingId
+          in: path
+          required: true
+          schema:
+            type: string
+            example: HQ 50 XXX
+            description: Prefix, number and voucher
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                isPremium:
+                  type: boolean
+                  example: false
+                isSelfService:
+                  type: boolean
+                  example: false
+      responses:
+        '200':
+          description: Update reservation properties
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  prefix:
+                    type: string
+                    example: "HQ"
+                  number:
+                    type: integer
+                    example: 50
+                  voucher:
+                    type: string
+                    example: "XXX"
+                  status:
+                    type: string
+                    example: "success"
+
+  /api/v1/touroperator/bookings/{bookingId}/checkout:
+    post:
+      description: checkout vehicle
+      parameters:
+        - name: tokenValue
+          in: header
+          schema:
+            type: string
+            example: a2f47f7d727cb7c3a9d7321cc69e6004
+        - name: bookingId
+          in: path
+          required: true
+          schema:
+            type: string
+            example: 'RES 506 7DEF0752'
+      requestBody:
+        content:
+          application/json:
+            schema:
+              properties:
+                fuel:
+                  type: integer
+                  example: 8
+                odometer:
+                  type: integer
+                  example: 10000
+                signature_image:
+                  type: string
+                  example: "bla=="
+                signature_checksum:
+                  type: string
+                  example: "c0428cb8fca576b7875367a8f5bb97172cf4f46a75adf5885aec3d16f9e641b6"
+      responses:
+        '200':
+          description: 'Engage the vehicle and start rental '
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  rentalPrefix:
+                    type: string
+                    example: 'RA'
+                  rentalNumber:
+                    type: string
+                    example: '755'
+                  rentalStatus:
+                    type: string
+                    example: 'ONGOING'
+                  startDate:
+                    type: string
+                    example: "2020-08-04T12:46:13Z"
+                  rentalId:
+                    type: integer
+                    example: 2603
+                  vehicleStatus:
+                    type: string
+                    example: "ENGAGED"
+  /api/v1/touroperator/bookings/{bookingId}/checkin:
+    post:
+      description: check in vehicle and close the movement
+      parameters:
+        - name: tokenValue
+          in: header
+          schema:
+            type: string
+            example: a2f47f7d727cb7c3a9d7321cc69e6004
+        - name: bookingId
+          in: path
+          required: true
+          schema:
+            type: string
+            example: 'RES 510 E9366960'
+      requestBody:
+        content:
+          application/json:
+            schema:
+              properties:
+                fuel:
+                  type: integer
+                  example: 5
+                odometer:
+                  type: integer
+                  example: 10100
+                note:
+                  type: string
+                  example: 'this is checkin note'
+      responses:
+        '200':
+          description: 'Engage the vehicle and start rental '
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: 'suucess'
+                  id:
+                    type: string
+                    example: 'RES 510 E9366960'
+  /api/v1/touroperator/uploaddocuments/driver:
+    post:
+      description: checkout vehicle
+      parameters:
+        - name: tokenValue
+          in: header
+          schema:
+            type: string
+            example: a2f47f7d727cb7c3a9d7321cc69e6004
+      requestBody:
+        description: update driver documents
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+                driverId:
+                  type: integer
+                  example: 5489
+      responses:
+        default:
+          description: status about upload documents
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: integer
+                    example: 5489
+                  status:
+                    type: string
+                    example: success
+                  msg:
+                    type: string
+                    example: document Uploaded Successfully
+  /api/v1/touroperator/uploaddocuments/customer:
+    post:
+      description: checkout vehicle
+      parameters:
+        - name: tokenValue
+          in: header
+          schema:
+            type: string
+            example: a2f47f7d727cb7c3a9d7321cc69e6004
+      requestBody:
+        description: update driver documents
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+                customerId:
+                  type: integer
+                  example: 5489
+      responses:
+        default:
+          description: status abou upload documents
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: integer
+                    example: 5489
+                  status:
+                    type: string
+                    example: success
+                  msg:
+                    type: string
+                    example: document Uploaded Successfully
+  /api/v1/touroperator/groups:
+    get:
+      description : All group wireframe images
+      parameters:
+        - name: tokenValue
+          in: header
+          required: true
+          schema:
+            type: string
+            example: a2f47f7d727cb7c3a9d7321cc69e6004
+      responses:
+        '200':
+          description: Get All wireframe  Images  with group Details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/groups'
+              examples:
+                '0':
+                  value: "{\r\n    \"data\": [\r\n        {\r\n            \"id\": 56,\r\n            \"nationalCode\": \"B\",\r\n            \"internationalCode\": \"CCMR\",\r\n            \"wireframeImage\": null,\r\n            \"description\": \"ECONOMY\",\r\n            \"isSelfService\": false\r\n        },\r\n        {\r\n            \"id\": 57,\r\n            \"nationalCode\": \"D\",\r\n            \"internationalCode\": \"CDMR\",\r\n            \"wireframeImage\": null,\r\n            \"description\": \"COMPACT MANUALE\",\r\n            \"isSelfService\": false\r\n        },\r\n        {\r\n            \"id\": 58,\r\n            \"nationalCode\": \"E\",\r\n            \"internationalCode\": \"CDAR\",\r\n            \"wireframeImage\": null,\r\n            \"description\": \"COMPACT AUTOMATICO\",\r\n            \"isSelfService\": false\r\n        },\r\n        {\r\n            \"id\": 60,\r\n            \"nationalCode\": \"CDMR-1\",\r\n            \"internationalCode\": \"CDMR-1\",\r\n            \"wireframeImage\": null,\r\n            \"description\": \"PREMIUM  CARS A\",\r\n            \"isSelfService\": false\r\n        },\r\n        {\r\n            \"id\": 61,\r\n            \"nationalCode\": \"K\",\r\n            \"internationalCode\": \"IFAR\",\r\n            \"wireframeImage\": null,\r\n            \"description\": \"SUV GRANDE AUTOMATICO\",\r\n            \"isSelfService\": false\r\n        },\r\n        {\r\n            \"id\": 62,\r\n            \"nationalCode\": \"N\",\r\n            \"internationalCode\": \"SVMR\",\r\n            \"wireframeImage\": null,\r\n            \"description\": \"MINIVAN (5+2) MANUALE\",\r\n            \"isSelfService\": false\r\n        },\r\n        {\r\n            \"id\": 63,\r\n            \"nationalCode\": \"O\",\r\n            \"internationalCode\": \"SVAR\",\r\n            \"wireframeImage\": null,\r\n            \"description\": \"MINIVAN (5+2) AUTOMATICO\",\r\n            \"isSelfService\": false\r\n        },\r\n        {\r\n            \"id\": 64,\r\n            \"nationalCode\": \"C\",\r\n            \"internationalCode\": \"CCAR\",\r\n            \"wireframeImage\": null,\r\n            \"description\": \"ECONOMY AUTOMATICA \",\r\n            \"isSelfService\": false\r\n        },\r\n        {\r\n            \"id\": 65,\r\n            \"nationalCode\": \"S\",\r\n            \"internationalCode\": \"XFAR\",\r\n            \"wireframeImage\": null,\r\n            \"description\": \"LUXURY\",\r\n            \"isSelfService\": false\r\n        },\r\n        {\r\n            \"id\": 66,\r\n            \"nationalCode\": \"R_H\",\r\n            \"internationalCode\": \"IFAH\",\r\n            \"wireframeImage\": null,\r\n            \"description\": \"EXECUTIVE HYBRID\",\r\n            \"isSelfService\": false\r\n        },\r\n        {\r\n            \"id\": 67,\r\n            \"nationalCode\": \"P\",\r\n            \"internationalCode\": \"PVMR\",\r\n            \"wireframeImage\": null,\r\n            \"description\": \"MINIBUS 9 POSTI MANUALE\",\r\n            \"isSelfService\": false\r\n        },\r\n        {\r\n            \"id\": 68,\r\n            \"nationalCode\": \"X\",\r\n            \"internationalCode\": \"EKMR\",\r\n            \"wireframeImage\": null,\r\n            \"description\": \"FURGONE PICCOLO\",\r\n            \"isSelfService\": false\r\n        },\r\n        {\r\n            \"id\": 69,\r\n            \"nationalCode\": \"Y\",\r\n            \"internationalCode\": \"FKMR\",\r\n            \"wireframeImage\": null,\r\n            \"description\": \"FURGONI GRANDI \",\r\n            \"isSelfService\": false\r\n        },\r\n        {\r\n            \"id\": 70,\r\n            \"nationalCode\": \"Z\",\r\n            \"internationalCode\": \"DKMR-3\",\r\n            \"wireframeImage\": null,\r\n            \"description\": \"FURGONI GRANDI CABINATI \",\r\n            \"isSelfService\": false\r\n        },\r\n        {\r\n            \"id\": 71,\r\n            \"nationalCode\": \"Z2\",\r\n            \"internationalCode\": \"IVMR-4\",\r\n            \"wireframeImage\": null,\r\n            \"description\": \"FURGONI GRANDI CON SPONDA IDRAULICA \",\r\n            \"isSelfService\": false\r\n        },\r\n        {\r\n            \"id\": 72,\r\n            \"nationalCode\": \"W1\",\r\n            \"internationalCode\": \"AAAA\",\r\n            \"wireframeImage\": null,\r\n            \"description\": \"SCOOTER 125cc\",\r\n            \"isSelfService\": false\r\n        },\r\n        {\r\n            \"id\": 73,\r\n            \"nationalCode\": \"U\",\r\n            \"internationalCode\": \"CCAH\",\r\n            \"wireframeImage\": null,\r\n            \"description\": \"ELECTRIC CAR\",\r\n            \"isSelfService\": false\r\n        },\r\n        {\r\n            \"id\": 74,\r\n            \"nationalCode\": \"U-2\",\r\n            \"internationalCode\": \"CDAH\",\r\n            \"wireframeImage\": null,\r\n            \"description\": \"ELECTRIC CARS\",\r\n            \"isSelfService\": false\r\n        },\r\n        {\r\n            \"id\": 76,\r\n            \"nationalCode\": \"V_2\",\r\n            \"internationalCode\": \"MXMR\",\r\n            \"wireframeImage\": null,\r\n            \"description\": \"FUNNY CAR 2\",\r\n            \"isSelfService\": false\r\n        },\r\n        {\r\n            \"id\": 77,\r\n            \"nationalCode\": \"V\",\r\n            \"internationalCode\": \"LTAR\",\r\n            \"wireframeImage\": null,\r\n            \"description\": \"FUNNY CAR\",\r\n            \"isSelfService\": false\r\n        },\r\n        {\r\n            \"id\": 78,\r\n            \"nationalCode\": \"T\",\r\n            \"internationalCode\": \"LDAR\",\r\n            \"wireframeImage\": null,\r\n            \"description\": \"SUPER LUXURY\",\r\n            \"isSelfService\": false\r\n        },\r\n        {\r\n            \"id\": 79,\r\n            \"nationalCode\": \"XDAR\",\r\n            \"internationalCode\": \"XDAR\",\r\n            \"wireframeImage\": null,\r\n            \"description\": \"LUXURY AND RACING E\",\r\n            \"isSelfService\": false\r\n        },\r\n        {\r\n            \"id\": 80,\r\n            \"nationalCode\": \"T_2\",\r\n            \"internationalCode\": \"LFAR\",\r\n            \"wireframeImage\": null,\r\n            \"description\": \"SUPER LUXURY\",\r\n            \"isSelfService\": false\r\n        },\r\n        {\r\n            \"id\": 83,\r\n            \"nationalCode\": \"_ZPROMO_B\",\r\n            \"internationalCode\": \"_ZPROMO_B\",\r\n            \"wireframeImage\": null,\r\n            \"description\": \"PROMO CLIO\",\r\n            \"isSelfService\": false\r\n        },\r\n        {\r\n            \"id\": 98,\r\n            \"nationalCode\": \"PXAR\",\r\n            \"internationalCode\": \"PXAR\",\r\n            \"wireframeImage\": null,\r\n            \"description\": \"PREMIUM XTRAORD AUTOMATIC\",\r\n            \"isSelfService\": false\r\n        },\r\n        {\r\n            \"id\": 103,\r\n            \"nationalCode\": \"CFMR-1\",\r\n            \"internationalCode\": \"CFMR-1\",\r\n            \"wireframeImage\": null,\r\n            \"description\": \"CITY CARS B\",\r\n            \"isSelfService\": false\r\n        },\r\n        {\r\n            \"id\": 104,\r\n            \"nationalCode\": \"H\",\r\n            \"internationalCode\": \"CFMR\",\r\n            \"wireframeImage\": null,\r\n            \"description\": \"SUV MEDIO MANUALE\",\r\n            \"isSelfService\": false\r\n        },\r\n        {\r\n            \"id\": 106,\r\n            \"nationalCode\": \"J\",\r\n            \"internationalCode\": \"IFMR\",\r\n            \"wireframeImage\": null,\r\n            \"description\": \"SUV GRANDE MANUALE\",\r\n            \"isSelfService\": false\r\n        },\r\n        {\r\n            \"id\": 107,\r\n            \"nationalCode\": \"SFMR\",\r\n            \"internationalCode\": \"SFMR\",\r\n            \"wireframeImage\": null,\r\n            \"description\": \"PREMIUM CARS C\",\r\n            \"isSelfService\": false\r\n        },\r\n        {\r\n            \"id\": 108,\r\n            \"nationalCode\": \"L2\",\r\n            \"internationalCode\": \"CFMR-3\",\r\n            \"wireframeImage\": null,\r\n            \"description\": \"MONOVOLUME  MANUALE 2\",\r\n            \"isSelfService\": false\r\n        },\r\n        {\r\n            \"id\": 109,\r\n            \"nationalCode\": \"G\",\r\n            \"internationalCode\": \"ILAR\",\r\n            \"wireframeImage\": null,\r\n            \"description\": \"BERLINA AUTOMATICA\",\r\n            \"isSelfService\": false\r\n        },\r\n        {\r\n            \"id\": 110,\r\n            \"nationalCode\": \"K3\",\r\n            \"internationalCode\": \"SFAR\",\r\n            \"wireframeImage\": null,\r\n            \"description\": \"SUV GRANDE AUTOMATICO 2\",\r\n            \"isSelfService\": false\r\n        },\r\n        {\r\n            \"id\": 112,\r\n            \"nationalCode\": \"R\",\r\n            \"internationalCode\": \"FDAR\",\r\n            \"wireframeImage\": null,\r\n            \"description\": \"EXECUTIVE\",\r\n            \"isSelfService\": false\r\n        },\r\n        {\r\n            \"id\": 113,\r\n            \"nationalCode\": \"K2\",\r\n            \"internationalCode\": \"PFAR\",\r\n            \"wireframeImage\": null,\r\n            \"description\": \"SUV GRANDE AUTOMATICO 3\",\r\n            \"isSelfService\": false\r\n        },\r\n        {\r\n            \"id\": 114,\r\n            \"nationalCode\": \"R_H2\",\r\n            \"internationalCode\": \"PDAH\",\r\n            \"wireframeImage\": null,\r\n            \"description\": \"EXECUTIVE HYBRID\",\r\n            \"isSelfService\": false\r\n        },\r\n        {\r\n            \"id\": 115,\r\n            \"nationalCode\": \"G_H\",\r\n            \"internationalCode\": \"PFAH\",\r\n            \"wireframeImage\": null,\r\n            \"description\": \"BERLINA AUTOMATICA HYBRID\",\r\n            \"isSelfService\": false\r\n        },\r\n        {\r\n            \"id\": 117,\r\n            \"nationalCode\": \"Q\",\r\n            \"internationalCode\": \"PVAR\",\r\n            \"wireframeImage\": null,\r\n            \"description\": \"MINIBUS 9 POSTI AUTOMATICO\",\r\n            \"isSelfService\": false\r\n        },\r\n        {\r\n            \"id\": 118,\r\n            \"nationalCode\": \"W2\",\r\n            \"internationalCode\": \"AAAB\",\r\n            \"wireframeImage\": null,\r\n            \"description\": \"SCOOTER 300cc\",\r\n            \"isSelfService\": false\r\n        },\r\n        {\r\n            \"id\": 119,\r\n            \"nationalCode\": \"SPECIAL\",\r\n            \"internationalCode\": \"SPECIAL\",\r\n            \"wireframeImage\": null,\r\n            \"description\": \"SPECIAL CARS\",\r\n            \"isSelfService\": false\r\n        },\r\n        {\r\n            \"id\": 120,\r\n            \"nationalCode\": \"M\",\r\n            \"internationalCode\": \"CWAR\",\r\n            \"wireframeImage\": null,\r\n            \"description\": \"SW-MONOVOLUME AUTOMATICO \",\r\n            \"isSelfService\": false\r\n        },\r\n        {\r\n            \"id\": 121,\r\n            \"nationalCode\": \"L\",\r\n            \"internationalCode\": \"CWMR\",\r\n            \"wireframeImage\": null,\r\n            \"description\": \"SW-MONOVOLUME MANUALE\",\r\n            \"isSelfService\": false\r\n        },\r\n        {\r\n            \"id\": 122,\r\n            \"nationalCode\": \"EDMR\",\r\n            \"internationalCode\": \"EDMR\",\r\n            \"wireframeImage\": null,\r\n            \"description\": \"ECONOMY\",\r\n            \"isSelfService\": false\r\n        },\r\n        {\r\n            \"id\": 123,\r\n            \"nationalCode\": \"CFMR\",\r\n            \"internationalCode\": \"CFMR\",\r\n            \"wireframeImage\": null,\r\n            \"description\": \"CFMR \",\r\n            \"isSelfService\": false\r\n        },\r\n        {\r\n            \"id\": 124,\r\n            \"nationalCode\": \"Q_S\",\r\n            \"internationalCode\": \"PVAR SNOW\",\r\n            \"wireframeImage\": null,\r\n            \"description\": \"MINIBUS 9 POSTI AUTOMATICO WINTER TYRES\",\r\n            \"isSelfService\": false\r\n        },\r\n        {\r\n            \"id\": 125,\r\n            \"nationalCode\": \"M_S\",\r\n            \"internationalCode\": \"CWAR SNOW\",\r\n            \"wireframeImage\": null,\r\n            \"description\": \"SW-MONOVOLUME AUTOMATICO  WINTER TYRES\",\r\n            \"isSelfService\": false\r\n        },\r\n        {\r\n            \"id\": 126,\r\n            \"nationalCode\": \"H_S\",\r\n            \"internationalCode\": \"CFMR SNOW\",\r\n            \"wireframeImage\": null,\r\n            \"description\": \"SUV MEDIO MANUALE WINTER TYRES\",\r\n            \"isSelfService\": false\r\n        },\r\n        {\r\n            \"id\": 127,\r\n            \"nationalCode\": \"O_S\",\r\n            \"internationalCode\": \"SVAR SNOW\",\r\n            \"wireframeImage\": null,\r\n            \"description\": \"MINIVAN (5+2) AUTOMATICO WINTER TYRES\",\r\n            \"isSelfService\": false\r\n        },\r\n        {\r\n            \"id\": 128,\r\n            \"nationalCode\": \"H-2\",\r\n            \"internationalCode\": \"IFMR-2\",\r\n            \"wireframeImage\": null,\r\n            \"description\": \"SUV MEDIO MANUALE\",\r\n            \"isSelfService\": false\r\n        },\r\n        {\r\n            \"id\": 129,\r\n            \"nationalCode\": \"I\",\r\n            \"internationalCode\": \"CFAR\",\r\n            \"wireframeImage\": null,\r\n            \"description\": \"SUV MEDIO AUTOMATICO\",\r\n            \"isSelfService\": false\r\n        },\r\n        {\r\n            \"id\": 130,\r\n            \"nationalCode\": \"D_S\",\r\n            \"internationalCode\": \"CDMR SNOW\",\r\n            \"wireframeImage\": null,\r\n            \"description\": \"COMPACT MANUALE WINTER TYRES\",\r\n            \"isSelfService\": false\r\n        },\r\n        {\r\n            \"id\": 131,\r\n            \"nationalCode\": \"L_S\",\r\n            \"internationalCode\": \"CWMR SNOW\",\r\n            \"wireframeImage\": null,\r\n            \"description\": \"SW-MONOVOLUME MANUALE WINTER TYRES\",\r\n            \"isSelfService\": false\r\n        },\r\n        {\r\n            \"id\": 132,\r\n            \"nationalCode\": \"W3\",\r\n            \"internationalCode\": \"AAAC\",\r\n            \"wireframeImage\": null,\r\n            \"description\": \"MOTOCICLETTA\",\r\n            \"isSelfService\": false\r\n        },\r\n        {\r\n            \"id\": 133,\r\n            \"nationalCode\": \"A\",\r\n            \"internationalCode\": \"MBMR\",\r\n            \"wireframeImage\": null,\r\n            \"description\": \"MINI\",\r\n            \"isSelfService\": false\r\n        },\r\n        {\r\n            \"id\": 134,\r\n            \"nationalCode\": \"F\",\r\n            \"internationalCode\": \"ILMR\",\r\n            \"wireframeImage\": null,\r\n            \"description\": \"BERLINA MANUALE\",\r\n            \"isSelfService\": false\r\n        },\r\n        {\r\n            \"id\": 135,\r\n            \"nationalCode\": \"_ZPROMO_A\",\r\n            \"internationalCode\": \"_ZPROMO_A\",\r\n            \"wireframeImage\": null,\r\n            \"description\": \"PROMO 108\",\r\n            \"isSelfService\": false\r\n        },\r\n        {\r\n            \"id\": 136,\r\n            \"nationalCode\": \"_ZPROMO_H\",\r\n            \"internationalCode\": \"_ZPROMO_H\",\r\n            \"wireframeImage\": null,\r\n            \"description\": \"PROMO QASHQAI\",\r\n            \"isSelfService\": false\r\n        },\r\n        {\r\n            \"id\": 137,\r\n            \"nationalCode\": \"_ZPROMO_K\",\r\n            \"internationalCode\": \"_ZPROMO_K\",\r\n            \"wireframeImage\": null,\r\n            \"description\": \"PROMO GRANDLAND X\",\r\n            \"isSelfService\": false\r\n        },\r\n        {\r\n            \"id\": 138,\r\n            \"nationalCode\": \"_ZPROMO_L\",\r\n            \"internationalCode\": \"_ZPROMO_L\",\r\n            \"wireframeImage\": null,\r\n            \"description\": \"PROMO C-MAX\",\r\n            \"isSelfService\": false\r\n        },\r\n        {\r\n            \"id\": 139,\r\n            \"nationalCode\": \"_ZPROMO_O\",\r\n            \"internationalCode\": \"_ZPROMO_O\",\r\n            \"wireframeImage\": null,\r\n            \"description\": \"PROMO 5008\",\r\n            \"isSelfService\": false\r\n        },\r\n        {\r\n            \"id\": 140,\r\n            \"nationalCode\": \"_ZPROMO_S\",\r\n            \"internationalCode\": \"_ZPROMO_S\",\r\n            \"wireframeImage\": null,\r\n            \"description\": \"PROMO DISCOVERY\",\r\n            \"isSelfService\": false\r\n        },\r\n        {\r\n            \"id\": 141,\r\n            \"nationalCode\": \"_ZPROMO_T\",\r\n            \"internationalCode\": \"_ZPROMO_T\",\r\n            \"wireframeImage\": null,\r\n            \"description\": \"PROMO LEVANTE\",\r\n            \"isSelfService\": false\r\n        }\r\n    ]\r\n}"
+  /api/v1/touroperator/extendReservation:
+    post:
+      summary: Extend reservation and associated rental.
+      description: Extend reservation
+      parameters:
+        - name: tokenValue
+          in: header
+          schema:
+            type: string
+            example: a2f47f7d727cb7c3a9d7321cc69e6004
+        - name: userName
+          in: header
+          schema:
+            type: string
+            example: test
+        - name: password
+          in: header
+          schema:
+            type: string
+            example: test
+        - name: companyCode
+          in: header
+          schema:
+            type: string
+            example: Dogma
+      requestBody:
+        content:
+          application/json:
+            schema:
+              properties:
+                bookingId:
+                  type: string
+                  description: 'reservation prefix, number and code'
+                  example: 'RES 2 415BCB50'
+                voucherNumber:
+                  type: string
+                  description: 'voucher number'
+                  example: 'DG123456'
+                notes:
+                  type: string
+                  description: 'Notes to append in reservation & rental'
+                  example: 'Test'
+                endDate:
+                  type: string
+                  description: 'End date of booking'
+                  example: '2022-02-05T12:00:00'
+                daysToExtend:
+                  type: string
+                  description: 'No of days to extend reservation or rental'
+                  example : '5'
+            examples:
+              '0' :
+                value : {
+                           "bookingId":"RES 2 415BCB50",
+                            "endDate" : "2022-02-05T12:00:00",
+                            "voucherNumber" : "",
+                            "daysToExtend" : "5",
+                            "notes" : "Testing"
+                        }
+              '1' :
+                value : {
+                           "voucherNumber":"RES 4 04E8AAC6",
+                            "endDate" : "2022-02-13T12:00:00",
+                            "notes" : "Test again"
+                        }
+              '2' :
+                value : {
+                           "voucherNumber":"RES 4 04E8AAC6",
+                            "daysToExtend" : "5"
+                        }
+      responses:
+        '200':
+          description: Get status and data related to reservation
+          content:
+            application/json:
+              schema:
+                  type: object
+                  properties:
+                    status:
+                      type: string
+                      example: 'suucess'
+                    data:
+                      type: object
+                      example:
+                              "data": {
+                                    "dbid": "13928",
+                                    "info": "RES 2 415BCB50",
+                                    "Instance": "415BCB50",
+                                    "PickUpLocation": "MXP - MALPENSA AIRPORT",
+                                    "ReturnLocation": "MXP - MALPENSA AIRPORT",
+                                    "PickUpDateTime": "2022-01-25T11:00:00",
+                                    "ReturnDateTime": "2022-02-05T12:00:00",
+                                    "client": "Test - Test",
+                                    "driver1": null,
+                                    "driver2": null,
+                                    "driver3": null,
+                                    "rezVoucher": null,
+                                    "prepaidDays": null,
+                                    "companyName": "Dogma Systems",
+                                    "isCancel": "false",
+                                    "isRefused": "false",
+                                    "isNoShow": "false",
+                                    "isRental": "true",
+                                    "isConfirmed": "false",
+                                    "totalAmount": "238.8",
+                                    "group": "D / CDMR / COMPACT MANUALE",
+                                    "groupAssign": "H / CFMR / SUV MEDIO MANUALE",
+                                    "notes": "-TestingTesting",
+                                    "movementData": {},
+                                    "rentalMap": {
+                                        "dbId": "10849",
+                                        "info": "RA 1 2022-01-21",
+                                        "PickUpLocation": "MXP - MALPENSA AIRPORT",
+                                        "ReturnLocation": "MXP - MALPENSA AIRPORT",
+                                        "PickUpDateTime": "2022-01-21T04:18:00",
+                                        "ReturnDateTime": "2022-02-05T12:00:00",
+                                        "client": "Test - Test",
+                                        "driver1": "Test - Test",
+                                        "driver2": null,
+                                        "driver3": null,
+                                        "rentalTotal": "583.97",
+                                        "group": "D / CDMR / COMPACT MANUALE",
+                                        "groupAssign": "H / CFMR / SUV MEDIO MANUALE",
+                                        "pagamenti": "BONIFICO 30 GG. FM, 000, SDD",
+                                        "notes": "-TestingTesting",
+                                        "movementMap": {
+                                            "PickUpLocation": "MXP - MALPENSA AIRPORT",
+                                            "ReturnLocation": "MXP - MALPENSA AIRPORT",
+                                            "pickUpDate": "2022-01-21T04:18:00",
+                                            "returnDate": "2022-02-05T12:00:00",
+                                            "vehicle": "PlaneNumber-NISSAN-QASHQAI_1.5_Dci_115cv_BUSINESS"
+                                        }
+                                    }
+                                }
+  /api/v1/touroperator/modifyReservation:
+    post:
+      summary: Modify reservation
+      description: Modify reservation
+      parameters:
+        - name: tokenValue
+          in: header
+          schema:
+            type: string
+            example: a2f47f7d727cb7c3a9d7321cc69e6004
+        - name: userName
+          in: header
+          schema:
+            type: string
+            example: test
+        - name: password
+          in: header
+          schema:
+            type: string
+            example: test
+        - name: companyCode
+          in: header
+          schema:
+            type: string
+            example: Dogma
+      requestBody:
+        content:
+          application/json:
+            schema:
+              properties:
+                bookingId:
+                  type: string
+                  description: 'reservation prefix, number and code'
+                  example: 'RES 2 415BCB50'
+                voucherNumber:
+                  type: string
+                  description: 'voucher number'
+                  example: 'DG123456'
+                notes:
+                  type: string
+                  description: 'Notes to append in reservation & rental'
+                  example: 'Test'
+                pickUpDate:
+                  type: string
+                  description: 'Start date of booking'
+                  example: '2022-02-01T12:00:00'
+                dropoffDate:
+                  type: string
+                  description: 'End date of booking'
+                  example: '2022-02-05T12:00:00'
+                bookedGroup:
+                  type: string
+                  description: 'Group code'
+                  example : 'B'
+                pickUpLocation:
+                  type: string
+                  description: 'Pick up location code'
+                  example : 'JFK'
+                dropoffLocation:
+                  type: string
+                  description: 'Drop off location code'
+                  example : 'JFK'
+                firstName:
+                  type: string
+                  description: 'First name of the customer'
+                  example : 'test'
+                lastName:
+                  type: string
+                  description: 'Last name of the customer'
+                  example : 'test'
+                ragioneSociale:
+                  type: string
+                  description: 'Comapny Name'
+                  example : 'test'
+                codice:
+                  type: string
+                  description: 'Code of the customer'
+                  example : 'test'
+                street:
+                  type: string
+                  description: 'Street'
+                  example : 'test'
+                num:
+                  type: string
+                  description: 'Number'
+                  example : 'test'
+                city:
+                  type: string
+                  description: 'City'
+                  example : 'test'
+                zip:
+                  type: string
+                  description: 'Zip code'
+                  example : '12345'
+                country:
+                  type: string
+                  description: 'Country'
+                  example : 'ITALIA'
+                state:
+                  type: string
+                  description: 'State'
+                  example : 'test'
+                phNum1:
+                  type: string
+                  description: 'Phone number of the customer'
+                  example : '23412345'
+                phNum2:
+                  type: string
+                  description: 'Phone number of the customer'
+                  example : '345234555'
+                mobileNumber:
+                  type: string
+                  description: 'Mobile number of the customer'
+                  example : '1234555'
+                email:
+                  type: string
+                  description: 'Email of the customer'
+                  example : 'test@test.com'
+                vatNumber:
+                  type: string
+                  description: 'Vat number'
+                  example : 'test'
+                birthPlace:
+                  type: string
+                  description: 'birth place of the customer'
+                  example : 'Polverigi'
+                birthDate:
+                  type: string
+                  description: 'bith date of the customer'
+                  example : '1980-12-26'
+                birthProvince:
+                  type: string
+                  description: 'Birth Province of the customer'
+                  example : 'test'
+                birthNation:
+                  type: string
+                  example : 'test'
+                gender:
+                  type: boolean
+                  description: 'true->Male, false->Female'
+                  example : true
+                taxCode:
+                  type: string
+                  example : 'test'
+                document:
+                  type: string
+                  description: 'Documnet type'
+                  example : 'PATENT'
+                documentNumber:
+                  type: string
+                  example : '1234555'
+                licenceType:
+                  type: string
+                  example : 'test'
+                issueBy:
+                  type: string
+                  example : 'test'
+                releaseDate:
+                  type: string
+                  example : '1999-12-01'
+                expiryDate:
+                  type: string
+                  example : '2030-12-01'
+                eInvoiceEmail:
+                  type: string
+                  example : 'test'
+                eInvoiceCode:
+                  type: string
+                  example : 'test'
+                isPhysicalPerson:
+                  type: string
+                  description: 'Is physical person Or Legal Entity'
+                  example : 'true'
+                isIndividualCompany:
+                  type: string
+                  description: 'Is physical person Or Legal Entity'
+                  example : 'false'
+            examples:
+              '0' :
+                value : {
+                           "bookingId":"RES 1 5902A1CB",
+                            "pickUpDate":"2022-02-02T11:00:00",
+                            "dropoffDate":"2022-02-10T11:00:00",
+                            "bookedGroup":"B",
+                            "pickUpLocation":"FLR",
+                            "dropoffLocation":"MXP",
+                            "firstName": "TestFirstname",
+                            "lastName": "TestlastName",
+                            "ragioneSociale": null,
+                            "codice": null,
+                            "street": "VIA DOSSELLI",
+                            "num": "17",
+                            "city": "LUMEZZANE",
+                            "zip": "25065",
+                            "country": "ITALIA",
+                            "state": "BS",
+                            "phNum1": "3890460257",
+                            "phNum2": null,
+                            "mobileNumber": "3890469000",
+                            "email": null,
+                            "vatNumber": null,
+                            "birthPlace": "BRESCIA",
+                            "birthDate": "1980-12-16",
+                            "birthProvince": "BS",
+                            "birthNation": "ITALIA",
+                            "gender": true,
+                            "taxCode": "CRDDNL80T16B157F",
+                            "document": "PATENTE",
+                            "documentNumber": "Test",
+                            "licenceType": "B",
+                            "issueBy": "MCTC BS",
+                            "releaseDate": "1999-12-01",
+                            "expiryDate": "2029-12-03",
+                            "eInvoiceEmail": "test",
+                            "eInvoiceCode": "test2",
+                            "isPhysicalPerson" : "true",
+                            "isIndividualCompany" : "false"
+                        }
+      responses:
+        '200':
+          description: Get status and data related to reservation
+          content:
+            application/json:
+              schema:
+                  type: object
+                  properties:
+                    status:
+                      type: string
+                      example: 'suucess'
+                    data:
+                      type: object
+                      example:
+                              "data": {
+                                      "dbid": "13927",
+                                      "info": "RES 1 5902A1CB",
+                                      "Instance": "5902A1CB",
+                                      "PickUpLocation": "FLR - FIRENZE AIRPORT",
+                                      "ReturnLocation": "MXP - MALPENSA AIRPORT",
+                                      "PickUpDateTime": "2022-02-02T11:00:00",
+                                      "ReturnDateTime": "2022-02-10T11:00:00",
+                                      "client": "TestlastName - TestFirstname/CRDDNL80T16B157F",
+                                      "driver1": "TestlastName - TestFirstname/CRDDNL80T16B157F",
+                                      "driver2": null,
+                                      "driver3": null,
+                                      "rezVoucher": null,
+                                      "prepaidDays": null,
+                                      "companyName": "RENTAL PLUS SRL",
+                                      "isCancel": "false",
+                                      "isRefused": "false",
+                                      "isNoShow": "false",
+                                      "isRental": "false",
+                                      "isConfirmed": "false",
+                                      "totalAmount": "115.84",
+                                      "group": "B / CCMR / ECONOMY",
+                                      "groupAssign": "A / MBMR / MINI",
+                                      "notes": "-nullnullnull",
+                                      "movementData": {
+                                          "PickUpLocation": "FLR - FIRENZE AIRPORT",
+                                          "ReturnLocation": "MXP - MALPENSA AIRPORT",
+                                          "pickUpDate": "2022-02-02T11:00:00",
+                                          "returnDate": "2022-02-10T11:00:00",
+                                          "vehicle": "GF962VG-FIAT-500_1.0_70cv_HYBRID_DOLCEVITA"
+                                      }
+                                }
+  /api/v1/booking/reservationSource :
+    get :
+        description : Fetching Reservation Source for Booking
+        parameters  :
+          - name : tokenValue
+            in   : header
+            required : true
+            schema :
+                 type : string
+                 example : "34edrf5tg6yhhhfghhh788uhj"
+        requestBody:
+          content:
+            application/json:
+              schema:
+                properties:
+                  macroDescription:
+                    type: string
+                    description: 'macro class description or web description'
+                    example: 'TESTWEB'
+        responses  :
+             '200' :
+               description : Get the list of reservation source for Booking
+               content :
+                     application/JSON :
+                        schema :
+                           type : object
+                           properties :
+                               Id :
+                                 type : integer
+                               Codice :
+                                  type : string
+                               RagioneSociale :
+                                  type : string
+
+  /api/v1/touroperator/getInsuranceList :
+    post:
+      summary:  Insurance Optional API
+      description : insurance optional list for booking
+      parameters:
+        - name: tokenValue
+          in: header
+          required: true
+          schema:
+            type: string
+            example: "8f9860c89879725ae887bd6a68e7187"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              properties:
+               group:
+                  type: string
+                  description: 'group code'
+                  example: 'SMSR'
+               reservation source:
+                  type: string
+                  description: 'reservation source code'
+                  example: 'DISCOVER'
+               locationCode:
+                  type: string
+                  description: 'location Code'
+                  example: 'BGY_RS'
+               startDate:
+                  type: string
+                  description: 'start date'
+                  example: '2022-02-05T12:00:00'
+               endDate:
+                  type: string
+                  description: 'end date'
+                  example : '2022-06-05T12:00:00'
+            examples:
+              '0' :
+                value : {
+                          "group" : "SMSR" ,
+                          "reservationSource" : "DISCOVER",
+                          "locationCode" : "BGY_RS" ,
+                          "startDate" : "2022-12-27 08:00" ,
+                          "endDate" : "2022-12-30 08:30"
+                        }
+
+      responses:
+        '200':
+          description: Get all insurance optional list for booking
+          content:
+            application/json:
+              schema:
+                 $ref: '#/components/schemas/insuranceSpecResponse'
+
+              examples:
+                '0' :
+                  value : {
+                            "Specification": [
+                                {
+                                    "id ": 1,
+                                    "Description ": "TEST"
+                                }
+                            ],
+                            "Booking Insurance": [
+                                {
+                                    "Description": "TEST",
+                                    "isRecommended": true,
+                                    "Amount": 9,
+                                    "Specification": [
+                                        "TEST"
+                                    ]
+                                }
+                            ]
+
+                        }
+
+
+  /api/v1/touroperator/getPrivacyAndTerms :
+    get:
+      summary:  CDNUrl of Privacy/Policy, Terms&Condition and condition text API
+      description : CDNUrl of Privacy/Policy, Terms&Condition and condition text for booking
+      parameters:
+        - name: tokenValue
+          in: header
+          required: true
+          schema:
+            type: string
+            example: "f4ce46fe3fe41b18bcb4d17b0bd5b972"
+        - name: language
+          in: query
+          required: false
+          schema:
+            type: string
+            example: "it"
+
+      responses:
+        '200':
+          description: Get CDNUrl of Privacy/Policy and Terms&Condition
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  privacyfileUrl:
+                    type: object
+                  terms&ConditionUrl:
+                    type: object
+                  conditionText:
+                    type: object
+              examples:
+                '0' :
+                  value : "{\r\n    \"data\": {\r\n        \"privacyfileUrl\": \"https:\/\/dogmasystemscdn.s3.amazonaws.com\/rizzoautomobili\/documents\/condizionirizzo.pdf\",\r\n        \"termsConditionFile\": \"https:\/\/dogmasystemscdn.s3.amazonaws.com\/rizzoautomobili\/documents\/condizionirizzo.pdf\",\r\n        \"comditionText\": \"\"\r\n    },\r\n    \"errorMessage\": \"\",\r\n    \"status\": \"success\"\r\n}"
+
+  /api/v1/touroperator/{bookingId}/sendEmail :
+    post:
+      summary:  API to send confirmational email to the customer
+      description : It sends the email with attached pdf of the reservation invoice to the customer.
+      parameters:
+        - name: tokenValue
+          in: header
+          required: true
+          schema:
+            type: string
+            example: "5edd9a0987f84940a9277bc8d11e5f0d"
+        - name: bookingId
+          in: path
+          required: true
+          schema:
+            type: string
+            example: "8078"
+      requestBody:
+          content:
+            application/json:
+              schema:
+                properties:
+                 onRequest:
+                  type: string
+                  example: 'true'
+                 refuse:
+                   type: string
+                   example: 'true'
+                 paymentStatus:
+                  type: string
+                  example: 'true'
+              examples:
+                '0':
+                  value: "{\r\n      \"onRequest\":\"true\",\r\n       \"refuse\":\"true\"\r\n  }"
+                '1':
+                  value: "{\r\n      \"onRequest\":\"true\",\r\n       \"paymentFailure\":\"true\"\r\n  }"
+                '2':
+                  value: "{\r\n      \"onRequest\":\"true\"\r\n  }"
+      responses:
+        '200':
+          description: sends email to the customer
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  result:
+                    type: object
+                    example: true
+                  mailDetails:
+                    type: object
+                    example: []
+              examples:
+                '0' :
+                  value : {"result" : "true" , "mailDetails" : []}
+
+  /api/v1/booking/macroClassList:
+    get:
+      summary:  Macroclass List
+      description: Fetch Macroclass List
+      parameters:
+        - name: tokenValue
+          in: header
+          schema:
+            type: string
+          example: a2f47f7d727cb7c3a9d7321cc69e6004
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                 type: object
+              examples:
+                '0':
+                  value: "{\r\n        \"Id\": 1,\r\n        \"Description\": \"MOTOCICLI\",\r\n        \"WebDescription\": null,\r\n        \"Name\": \"MOTOCICLI\",\r\n        \"ExportCode\": null,\r\n        \"WebCode\": null\r\n    }"
+
+  /api/v1/touroperator/booking/getTextResource:
+    get:
+      summary: GET API for booking text resource
+      description:  GET API for booking text resource
+      parameters:
+        - name: tokenValue
+          in: header
+          schema:
+            type: string
+            example: 5094bd3060c4f07e2da8ccc67ee3b2e4
+        - name: language
+          in: query
+          schema:
+            type: string
+            example: IT
+
+      responses:
+        200:
+          description: GET API for booking text resource
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  body:
+                    type: string
+                  key:
+                     type: string
+
+              examples:
+                '0':
+                  value: "{\r\n    \"data\": [\r\n        {\r\n            \"key\": \"titleMain\",\r\n            \"body\": \"abc\"\r\n        }\r\n    ],\r\n    \"errorMessage\": \"\",\r\n    \"status\": \"success\"\r\n}"
+  /api/v1/onlineUser/{onlineUserId}/changepassword:
+    post:
+      summary:  Changepassword
+      description: APi for change password of online user if oldpassword is matching
+      parameters:
+        - name: tokenValue
+          in: header
+          schema:
+            type: string
+            example: 5094bd3060c4f07e2da8ccc67ee3b2e4
+        - name: onlineUserId
+          in: path
+          required: true
+          schema:
+            type: string
+            example: "1"
+      requestBody:
+          content:
+            application/json:
+              schema:
+                properties:
+                 oldPassword:
+                  type: string
+                  example: 'true'
+                 newPassword:
+                   type: string
+                   example: 'test'
+              examples:
+                '0':
+                  value: "{\r\n    \"oldPassword\":\"true\",\r\n    \"newPassword\":\"test\"\r\n}"
+      responses:
+        '200':
+          description: Get result Password update successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  result:
+                    type: object
+                    example: true
+              examples:
+                '0' :
+                  value : "{\r\n    \"data\": \"Password update successfully\",\r\n    \"errorMessage\": \"\",\r\n    \"status\": \"success\"\r\n}"
+  /api/v1/onlineUser/{onlineUserId}/lastReservation:
+    get:
+      summary: lastReservation
+      description: LastReservation of online user if last Reservation is not cancel
+      parameters:
+        - name: tokenValue
+          in: header
+          schema:
+            type: string
+            example: 5094bd3060c4f07e2da8ccc67ee3b2e4
+        - name: onlineUserId
+          in: path
+          required: true
+          schema:
+            type: string
+            example: "1"
+      responses:
+        '200':
+          description: sends email to the customer
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  result:
+                    type: object
+              examples:
+                '0' :
+                  value : "{\r\n    \"data\": {\r\n        \"dbid\": \"677\",\r\n        \"info\": \"CAGRES 1 8F00B070\",\r\n        \"Instance\": \"8F00B070\",\r\n        \"PickUpLocation\": \"CAG100 - Cagliari Apt\",\r\n        \"ReturnLocation\": \"CAG100 - Cagliari Apt\",\r\n        \"PickUpDateTime\": \"2023-01-04T12:02:00\",\r\n        \"ReturnDateTime\": \"2023-01-05T12:02:00\",\r\n        \"client\": \"TESTORE - FRANCO/TSTFNC53S02B594I\",\r\n        \"driver1\": \"TESTORE - FRANCO/TSTFNC53S02B594I\",\r\n        \"driver2\": null,\r\n        \"driver3\": null,\r\n        \"rezVoucher\": null,\r\n        \"prepaidDays\": null,\r\n        \"companyName\": \"FELIRENT SRL\",\r\n        \"isCancel\": \"false\",\r\n        \"isRefused\": \"false\",\r\n        \"isNoShow\": \"false\",\r\n        \"isRental\": \"true\",\r\n        \"isConfirmed\": \"false\",\r\n        \"totalAmount\": \"0.0\",\r\n        \"group\": \"A / NBMR / MINI ELITE\",\r\n        \"groupAssign\": \"A / NBMR / MINI ELITE\",\r\n        \"notes\": null,\r\n        \"movementData\": {},\r\n        \"Balance\": 0.0,\r\n        \"lastDatePayment\": null\r\n    },\r\n    \"errorMessage\": \"\",\r\n    \"status\": \"success\"\r\n}"
+
+  /api/v1/touroperator/getInsuranceExtraList:
+    post:
+      summary:  getInsuranceExtraList
+      description: getInsuranceExtraList for Optionals
+      parameters:
+        - name: tokenValue
+          in: header
+          schema:
+            type: string
+            example: 5094bd3060c4f07e2da8ccc67ee3b2e4
+      requestBody:
+          content:
+            application/json:
+              schema:
+                properties:
+                 extras:
+                  type: array
+                  example: []
+                 code:
+                  type: string
+                  example: 'PGR'
+                 amount:
+                   type: string
+                   example: '25'
+              examples:
+                '0':
+                  value: "{\r\n  \"extras\" : [\r\n{\"code\":\"PGR\",\r\n \"amount\":\"25\"},\r\n {\"code\":\"PT\",\r\n \"amount\":\"3.5\"}\r\n  ]     \r\n}"
+      responses:
+        '200':
+          description: Specification
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  result:
+                    type: object
+                    example: true
+              examples:
+                '0' :
+                  value : "{\r\n    \"Specification\": [\r\n        {\r\n            \"id\": 2,\r\n            \"Description\": \"COPERTURA FURTO\"\r\n        },\r\n        {\r\n            \"id\": 3,\r\n            \"Description\": \"COPERTURA CRISTALLI\"\r\n        },\r\n        {\r\n            \"id\": 4,\r\n            \"Description\": \"COPERTURA GOMME\"\r\n        },\r\n        {\r\n            \"id\": 5,\r\n            \"Description\": \"ASSISTENZA STRADALE\"\r\n        },\r\n        {\r\n            \"id\": 6,\r\n            \"Description\": \"ASSICURAZIONE AL CONDUCENTE\"\r\n        },\r\n        {\r\n            \"id\": 1,\r\n            \"Description\": \"DESCRIZIONE\"\r\n        },\r\n        {\r\n            \"id\": 7,\r\n            \"Description\": \"COPERTURA DANNI\"\r\n        }\r\n    ],\r\n    \"Booking Insurance\": [\r\n        {\r\n            \"Id\": 3,\r\n            \"Description\": \"PRIVILEGE COVER\",\r\n            \"isRecommended\": false,\r\n            \"Amount\": \"25\",\r\n            \"bookingText\": {\r\n                \"COPERTURA FURTO:PRIVILEGE COVER\": \"TOTALE\",\r\n                \"COPERTURA CRISTALLI:PRIVILEGE COVER\": \"TOTALE\",\r\n                \"COPERTURA GOMME:PRIVILEGE COVER\": \"TOTALE\",\r\n                \"ASSISTENZA STRADALE:PRIVILEGE COVER\": \"\",\r\n                \"ASSICURAZIONE AL CONDUCENTE:PRIVILEGE COVER\": \"\",\r\n                \"DESCRIZIONE:PRIVILEGE COVER\": \"Azzeramento della responsabilit\u00E0 per danni, (tentato) furto e incendio al veicolo, include assicurazione infortuni per conducente e passeggeri, copertura cristalli e gomme, include il soccorso stradale e riduce il deposito cauzionale a \u20AC 250\",\r\n                \"COPERTURA DANNI:PRIVILEGE COVER\": \"TOTALE\",\r\n                \"COPERTURA FURTO:SPECIAL COVER\": \"50%\",\r\n                \"COPERTURA CRISTALLI:SPECIAL COVER\": \"TOTALE\",\r\n                \"DESCRIZIONE:SPECIAL COVER\": \"Azzeramento della tua responsabilit\u00E0 per danni, riduzione del 50% della tua responsabilit\u00E0 per il furto, include copertura dei cristalli e riduce il tuo deposito cauzionale a \u20AC300\",\r\n                \"COPERTURA DANNI:SPECIAL COVER\": \"TOTALE\"\r\n            },\r\n            \"Specification\": [\r\n                \"COPERTURA FURTO\",\r\n                \"COPERTURA CRISTALLI\",\r\n                \"COPERTURA GOMME\",\r\n                \"ASSISTENZA STRADALE\",\r\n                \"ASSICURAZIONE AL CONDUCENTE\",\r\n                \"DESCRIZIONE\",\r\n                \"COPERTURA DANNI\"\r\n            ]\r\n        },\r\n        {\r\n            \"Id\": 2,\r\n            \"Description\": \"SPECIAL COVER\",\r\n            \"isRecommended\": false,\r\n            \"Amount\": \"3.5\",\r\n            \"bookingText\": {\r\n                \"COPERTURA FURTO:PRIVILEGE COVER\": \"TOTALE\",\r\n                \"COPERTURA CRISTALLI:PRIVILEGE COVER\": \"TOTALE\",\r\n                \"COPERTURA GOMME:PRIVILEGE COVER\": \"TOTALE\",\r\n                \"ASSISTENZA STRADALE:PRIVILEGE COVER\": \"\",\r\n                \"ASSICURAZIONE AL CONDUCENTE:PRIVILEGE COVER\": \"\",\r\n                \"DESCRIZIONE:PRIVILEGE COVER\": \"Azzeramento della responsabilit\u00E0 per danni, (tentato) furto e incendio al veicolo, include assicurazione infortuni per conducente e passeggeri, copertura cristalli e gomme, include il soccorso stradale e riduce il deposito cauzionale a \u20AC 250\",\r\n                \"COPERTURA DANNI:PRIVILEGE COVER\": \"TOTALE\",\r\n                \"COPERTURA FURTO:SPECIAL COVER\": \"50%\",\r\n                \"COPERTURA CRISTALLI:SPECIAL COVER\": \"TOTALE\",\r\n                \"DESCRIZIONE:SPECIAL COVER\": \"Azzeramento della tua responsabilit\u00E0 per danni, riduzione del 50% della tua responsabilit\u00E0 per il furto, include copertura dei cristalli e riduce il tuo deposito cauzionale a \u20AC300\",\r\n                \"COPERTURA DANNI:SPECIAL COVER\": \"TOTALE\"\r\n            },\r\n            \"Specification\": [\r\n                \"COPERTURA FURTO\",\r\n                \"COPERTURA CRISTALLI\",\r\n                \"DESCRIZIONE\",\r\n                \"COPERTURA DANNI\"\r\n            ]\r\n        }\r\n    ]\r\n}"
+
+components:
+  schemas:
+      BookingResponse:
+        type: object
+        properties:
+          data:
+            type: array
+            items:
+              $ref: '#/components/schemas/Booking'
+      Booking:
+        type: object
+        properties:
+          id:
+            type: string
+            example: 'HQ 53 TEST'
+          Type:
+            type: integer
+            example: 14
+          Instance:
+            type: string
+            example: 'TEST'
+          PickUpLocation:
+            type: string
+            example: 'NAP'
+          ReturnLocation:
+            type: string
+            example: 'NAP'
+          PickUpDateTime:
+            type: integer
+            example: "2019-08-01T10:00:00.000Z"
+          ReturnDateTime:
+            type: string
+            example: "2019-08-04T12:00:00.000Z"
+          Fees:
+            type: object
+            $ref: '#/components/schemas/Fees'
+          optionals:
+            type: array
+            items:
+              $ref: '#/components/schemas/optional'
+          TotalCharge:
+            type: object
+            $ref: '#/components/schemas/TotalCharge'
+          vehicle:
+            type: object
+            $ref: '#/components/schemas/bookingVehicle'
+          LocationDetails:
+            type: array
+            items:
+              $ref: '#/components/schemas/LocationDetails'
+          PaymentRole:
+            type: array
+            items:
+              $ref: '#/components/schemas/Payment'
+          customer:
+            type: object
+            $ref: '#/components/schemas/CustomerData'
+          Vendor:
+            type: string
+            example: 'Noleggiare Srl'
+          RentalRate:
+            type: object
+            $ref: '#/components/schemas/RentalRate'
+          rentalDetails:
+            type: object
+            $ref: '#/components/schemas/rentalDetails'
+      Fees:
+        type: object
+        properties:
+          CurrencyCode:
+            type: string
+            example: "EUR"
+          IncludedInEstTotalInd:
+            type: boolean
+            example: true
+          Description:
+            type: string
+            example: "ADDITIONAL DRIVER (ADDITIONAL DRIVER)"
+          IncludedInRate:
+            type: boolean
+            example: false
+          Amount:
+            type: integer
+            example: 3.45
+          Purpose:
+            type: integer
+            example: 12
+          TaxInclusive:
+            type: boolean
+            example: true
+      rentalDetails:
+        type: object
+        properties:
+          customerName:
+            type: string
+            example: "Test"
+          startDate:
+            type: string
+            example: "20-01-2021 11:00"
+          endDate:
+            type: string
+            example: "28-01-2021 11:00"
+          pickUpLocation:
+            type: string
+            example: "GOA"
+          dropOffLocation:
+            type: string
+            example: "CAS"
+          totalRental:
+            type: integer
+            example: 12.2
+      Customer:
+        type: object
+        properties:
+          GivenName:
+            type: string
+            example: 'First Name'
+          Surname:
+            type: string
+            example: 'SurName'
+          clientId:
+            type: string
+            example: '123'
+      LocationDetails:
+        type: object
+        properties:
+          Address:
+            type: object
+            $ref: '#/components/schemas/Address'
+          AtAirport:
+            type: boolean
+            example: true
+          Code:
+            type: string
+            example: "NAP"
+          CodeContext:
+            type: string
+            example: "Pickup Location"
+          Name:
+            type: string
+            example: "NAPOLI AEROPORTO"
+          Telephone:
+            type: string
+            example: "+39 0817802151"
+      Payment:
+        type: object
+        properties:
+          Amount:
+            type: string
+            example: 0
+          CurrencyCode:
+            type: string
+            example: EUR
+          DateTime:
+            type: string
+            example: '2019-05-25T09:39:00.000Z'
+          PaymentType:
+            type: integer
+            example: 28
+          Percent:
+            type: integer
+            example: 30
+          RuleType:
+            type: integer
+            example: 3
+          content:
+            type: string
+            example: 'Bonifico bancario'
+      Address:
+        type: object
+        properties:
+          CityName:
+            type: string
+            example: "NAPOLI"
+          CountryName:
+            type: string
+            example: "ITALIA"
+          FormattedInd:
+            type: boolean
+            example: true
+          PostalCode:
+            type: string
+            example: '80144'
+          StateProv:
+            type: object
+            properties:
+              StateCode:
+                type: string
+                example: 'AN'
+          StreetNmbr:
+            type: string
+            example: "VIA ORESTE SALOMONE 47/50"
+      quotationResponse:
+        type: object
+        properties:
+          data:
+            type: array
+            items:
+              $ref: '#/components/schemas/quotation'
+      quotation:
+        type: object
+        properties:
+          total:
+            type: integer
+          PickUpLocation:
+            type: string
+          ReturnLocation:
+            type: string
+          PickUpDateTime:
+            type: string
+          ReturnDateTime:
+            type: string
+          Vehicles:
+            type: array
+            items:
+              $ref: '#/components/schemas/vehicleStatus'
+          optionals:
+            type: array
+            items:
+              $ref: '#/components/schemas/optional'
+          TotalCharge:
+            type: object
+            $ref: '#/components/schemas/TotalCharge'
+      TotalCharge:
+        type: object
+        properties:
+          EstimatedTotalAmount:
+            type: integer
+          RateTotalAmount:
+            type: integer
+      optional:
+        type: object
+        properties:
+          Charge:
+            type: object
+            $ref: '#/components/schemas/Charge'
+          Equipment:
+            type: object
+            $ref: '#/components/schemas/Equipment'
+      Charge:
+        type : object
+        properties:
+          Amount:
+            type: integer
+          CurrencyCode:
+            type: string
+          Description:
+            type: string
+          IncludedInEstTotalInd:
+            type: boolean
+          IncludedInRate:
+            type: boolean
+          TaxInclusive:
+            type: boolean
+      Equipment:
+        type: object
+        properties:
+          Description:
+            type: string
+          EquipType:
+            type: string
+          Quantity:
+            type: integer
+          isMultipliable :
+            type: boolean
+          optionalImage:
+           type: string
+      vehicleStatus:
+        type: object
+        properties:
+          Status:
+            type: string
+          vehicle:
+            type: object
+            schema:
+            $ref: '#/components/schemas/bookingVehicle'
+      bookingVehicle:
+        type: object
+        properties:
+          Code:
+            type: string
+          CodeContext:
+            type: string
+          VehMakeModel:
+            type: array
+            items:
+            $ref: '#/components/schemas/VehMakeModel'
+          VendorCarMacroGroup:
+            type: string
+          VendorCarType:
+            type: string
+          km:
+            type: integer
+          color:
+            type: string
+          model:
+            type: string
+          plate_no:
+            type: string
+          brand:
+            type: string
+          version:
+            type: string
+          chasis_no:
+            type: string
+      VehMakeModel:
+        type: object
+        properties:
+          Name:
+            type: string
+      statusResponse:
+        type: object
+        properties:
+          id:
+            type: string
+            example: 'HQ 53 XXX'
+          status:
+            type: string
+            example: 'confirmed'
+      locationResponse:
+        type: object
+        properties:
+          data:
+            type: array
+            items:
+              $ref: '#/components/schemas/location'
+      vehicle:
+        type: object
+        properties:
+          id:
+            type: integer
+            example: 1425
+          location:
+            type: string
+            example: "CAS/CASSANO MAGNAGO"
+          description :
+            type: string
+            example: "CASSANO MAGNAGO"
+          national_code:
+            type: string
+            example: "T"
+          international_code:
+            type: string
+            example: 'LDAR'
+          plate_no:
+            type: string
+            example: 'FT233AP'
+            description: 'vehicle Plate number'
+          brand:
+            type: string
+            example: 'Maserati'
+          model:
+            type: string
+            example: 'Ghibli_GranSport_3.0_ V6_ 250cv_ automatico'
+          version:
+            type: string
+            example: '.'
+          chasis_no:
+            type: string
+            example: 'ZAMW557B001295240'
+            description: 'vehicle VIN '
+          park:
+            type: string
+            example: "CAS"
+          fuel_type:
+            type: string
+            example: 'DIESEL'
+          engine_size:
+            type: integer
+            example: 3000
+          level:
+            type: integer
+            example: 80
+          tankCapacity:
+            type: integer
+            example: 80
+          km:
+            type: integer
+            example: 40067
+          color:
+            type: string
+            example: 'NERO'
+          seats:
+            type: integer
+            example: 5
+          carwash:
+            type: boolean
+            example: true
+          isBulkhead:
+            type: boolean
+            example: false
+          isPower:
+            type: boolean
+            example: false
+          isSuitable:
+            type: boolean
+            example: false
+          car_class:
+            type: string
+            example: 'T/LDAR/SUPER LUXURY'
+          companyName:
+            type: string
+            example: 'RENTAL PLUS SRL'
+          damages:
+            type: array
+            items:
+              $ref: '#/components/schemas/Damage'
+          wireframeImage:
+            type: object
+            $ref : '#/components/schemas/wireframeImage'
+      location:
+        type: object
+        properties:
+          locationCode:
+            type: string
+          locationName:
+            type: string
+          locationAddress:
+            type: string
+          locationNumber:
+            type: integer
+          locationCity:
+            type: string
+          locationType:
+            type: integer
+          telephoneNumber:
+            type: string
+          cellNumber:
+           type: string
+          email:
+            description: location email
+            type: string
+          latitude:
+            type: string
+          longitude:
+            type: string
+          isAirport:
+            type: boolean
+          isRailway:
+            type: boolean
+          isAlwaysOpentrue:
+            type: boolean
+          isCarSharingEnabled:
+            type: boolean
+          allowPickUpDropOffOutOfHours:
+            type: boolean
+          hasKeyBox:
+            type: boolean
+          morningStartTime:
+            type: string
+          morningStopTime:
+            type: string
+          afternoonStartTime:
+            type: string
+          afternoonStopTime:
+            type: string
+          locationInfoEN:
+            type: string
+            description: "location instructions in English"
+          locationInfoLocal:
+            type: string
+            description: "location instructions in local labguage"
+          publicWebDescriptionEN:
+            type: string
+            description: "publicWebDescription in English"
+          publicWebDescription:
+            type: string
+            description: "publicWebDescription in local labguage"
+          openings:
+            type: array
+            items:
+              $ref: "#/components/schemas/weekOfDay"
+          festivity:
+            type: array
+            items:
+              $ref: '#/components/schemas/festivity'
+          minimumLeadTimeInHour:
+            type: string
+          country:
+            type: string
+          zipCode:
+            type: string
+      weekOfDay:
+        type: object
+        properties:
+          dayOfTheWeek:
+            type: integer
+          dayOfTheWeekName:
+            type: string
+          startTime:
+            type: string
+          endTime:
+            type: string
+      festivity:
+        type: object
+        properties:
+          id:
+            type: integer
+          description:
+            type: string
+      RentalRate:
+        type: object
+        properties:
+          CurrencyCode:
+            type: string
+            example: "EUR"
+          TaxAmount:
+            type: object
+            $ref: '#/components/schemas/TaxAmounts'
+      TaxAmounts:
+        type: object
+        properties:
+          CurrencyCode:
+            type: string
+            example: "EURO"
+          Description:
+            type: string
+            example: "VAT"
+          Percentage:
+            type: integer
+            example: 22
+          Total:
+            type: integer
+            example: 18.3
+      DriverResponse:
+        type: object
+        properties:
+          data:
+            type: object
+            properties:
+              id:
+                type: string
+                example: "RES 504 82D69B3B"
+              driver:
+                type: string
+                example: "DELL'AQUILA - LUCIANO/DLLLCN81A27L197Y"
+              status:
+                type: string
+                example: "success"
+
+      Driver:
+        type: object
+        properties:
+          isPhysicalPerson:
+            type: boolean
+            example: true
+          isClient:
+            type: boolean
+            example: true
+          isDriver:
+            type: boolean
+            example: true
+          name:
+            type: string
+            example: 'LUCIANO'
+          surname:
+            type: string
+            example: "DELL'AQUILA"
+          birthNation:
+            type: string
+            example: 'ITALIA'
+          birthPlace:
+            type: string
+            example: 'TOLVE'
+          birthProv:
+            type: string
+            example: 'pz'
+          gender:
+            type: boolean
+            example: true
+          birthDate:
+            type: string
+            example: '1981-01-27'
+          phoneNumb1:
+            type: string
+            example: '391 3682216'
+          phoneNumb2:
+            type: string
+            example: null
+          taxCode:
+            type: string
+            example: 'DLLLCN81A27L197Y'
+          companyName:
+            type: string
+            example: null
+          document:
+            type: string
+            example: "PATENTE"
+          releaseDate:
+            type: string
+            description: 'Date of release of document'
+            example: '2012-03-27'
+          expiryDate:
+            type: string
+            description: 'Expiry date'
+            example: '2022-05-10'
+          documentNumb:
+            type: string
+            description: 'identity number'
+            example: 'U1B181271N'
+          drivingLicense:
+            type: string
+            example: 'b'
+          document1:
+            type: string
+            description: "like CARTA D'IDENTITA',PASSAPORTO"
+            example: "CARTA D'IDENTITA'"
+          issueBy:
+            type: string
+            example: 'U.C.O'
+          releaseDate1:
+            type: string
+            example: '2012-03-27'
+          expiryDate1:
+            type: string
+            example: '2022-05-10'
+          documentNumb1:
+            type: string
+            description: 'identity number'
+            example: 'U1B181271N'
+          drivingLicense1:
+            type: string
+            example: 'b'
+          issueBy1:
+            type: string
+            example: 'U.C.O'
+          email:
+            type: string
+            example: 'luciano.delaquila1989@gmail.com'
+          street:
+            type: string
+            example: 'via G Garibaldi'
+          number:
+            type: integer
+            example: 13
+          postalCode:
+            type: string
+            example: '21055'
+          national:
+            type: string
+            example: 'ITALIA'
+          province:
+            type: string
+            example: 'VA'
+          city:
+            type: string
+            example: 'GORLA MINORE'
+          clientId:
+            type: string
+            example: 123
+      Damage:
+        type: object
+        properties:
+          description:
+            type: string
+            example: "N/A"
+          damageType:
+            type: string
+            example: null
+          damageDictionary:
+            type: string
+            example: "Hard alloy wheel rim"
+          x:
+            type: integer
+            example: 340
+          y:
+            type: string
+            example: 36
+          percentage_x:
+            type: integer
+            example: 48.71060172
+          percentage_y:
+            type: integer
+            example: 10.19830028
+      wireframeImage:
+        description: vehicle wireframe as per vehicle group
+        type: object
+        properties:
+          image:
+            type: string
+            description: "image in base64 encoded string"
+            example: "2NVWlJ5elRhVlQxSEFDUXljc2kxWWw1NndBQUFBQkpSVTVFcmtKZ2dnPT0="
+          height:
+            type: integer
+            example: 353
+          width:
+            type: integer
+            example: 698
+      groups:
+        type: object
+        properties:
+          data:
+            type: array
+            items:
+              $ref: '#/components/schemas/group'
+              example: ""
+
+      group:
+        type: object
+        properties:
+          id:
+            type: integer
+          nationalCode:
+            type: string
+          internationalCode:
+            type: string
+          wireframeImage:
+            type: object
+            $ref: '#/components/schemas/wireframeImage'
+          description:
+            type: string
+          isSelfService:
+            type: boolean
+
+      CustomerData :
+        type: object
+        properties:
+          clientId:
+            type: string
+            description: 'dbId of the customer'
+            example : '123'
+          Name:
+            type: string
+            description: 'First name of the customer'
+            example : 'test'
+          Surname:
+            type: string
+            description: 'Surname of the customer'
+            example : 'test'
+          firstName:
+            type: string
+            description: 'First name of the customer'
+            example : 'test'
+          lastName:
+            type: string
+            description: 'Last name of the customer'
+            example : 'test'
+          ragioneSociale:
+            type: string
+            description: 'Comapny Name'
+            example : 'test'
+          codice:
+            type: string
+            description: 'Code of the customer'
+            example : 'test'
+          street:
+            type: string
+            description: 'Street'
+            example : 'test'
+          num:
+            type: string
+            description: 'Number'
+            example : 'test'
+          city:
+            type: string
+            description: 'City'
+            example : 'test'
+          zip:
+            type: string
+            description: 'Zip code'
+            example : '12345'
+          country:
+            type: string
+            description: 'Country'
+            example : 'ITALIA'
+          state:
+            type: string
+            description: 'State'
+            example : 'test'
+          phNum1:
+            type: string
+            description: 'Phone number of the customer'
+            example : '23412345'
+          phNum2:
+            type: string
+            description: 'Phone number of the customer'
+            example : '345234555'
+          mobileNumber:
+            type: string
+            description: 'Mobile number of the customer'
+            example : '1234555'
+          email:
+            type: string
+            description: 'Email of the customer'
+            example : 'test@test.com'
+          vatNumber:
+            type: string
+            description: 'Vat number'
+            example : 'test'
+          birthPlace:
+            type: string
+            description: 'birth place of the customer'
+            example : 'Polverigi'
+          birthDate:
+            type: string
+            description: 'bith date of the customer'
+            example : '1980-12-26'
+          birthProvince:
+            type: string
+            description: 'Birth Province of the customer'
+            example : 'test'
+          birthNation:
+            type: string
+            example : 'test'
+          gender:
+            type: boolean
+            description: 'true->Male, false->Female'
+            example : true
+          taxCode:
+            type: string
+            example : 'test'
+          document:
+            type: string
+            description: 'Documnet type'
+            example : 'PATENT'
+          documentNumber:
+            type: string
+            example : '1234555'
+          licenceType:
+            type: string
+            example : 'test'
+          issueBy:
+            type: string
+            example : 'test'
+          releaseDate:
+            type: string
+            example : '1999-12-01'
+          expiryDate:
+            type: string
+            example : '2030-12-01'
+          eInvoiceEmail:
+            type: string
+            example : 'test'
+          eInvoiceCode:
+            type: string
+            example : 'test'
+          isPhysicalPerson:
+            type: string
+            description: 'Is physical person Or Legal Entity'
+            example : 'true'
+          isIndividualCompany:
+            type: string
+            description: 'Is physical person Or Legal Entity'
+            example : 'false'
+
+      insuranceResponse:
+        type: object
+        properties:
+          Specification:
+            type: object
+            $ref: '#/components/schemas/insuranceSpecResponse'
+          Booking Insurance:
+            type: object
+            $ref: '#/components/schemas/bookingInsurance'
+
+
+      insuranceSpecResponse:
+        type: object
+        properties:
+          id:
+            type: integer
+            example: "1"
+          description:
+             type: string
+             example: "INSURANCE_TEST"
+
+      bookingInsurance:
+        type: object
+        properties:
+          description:
+            type: string
+            example: "bike_ins"
+          isRecommended:
+            type: boolean
+            example: true
+          amount:
+            type: string
+            example: "35.6"
+          specification:
+            type: object
+            $ref: '#/components/schemas/specResponse'
+
+      specResponse:
+        type: object
+        properties:
+          description:
+            type: string
+            example: "bike_ins"
