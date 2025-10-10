@@ -17,6 +17,7 @@ app = FastAPI(
         "Simulazione FastAPI degli endpoint Myrent necessari a quotazioni e dettagli vettura.\n"
         f"Autenticazione: header `X-API-Key: {API_KEY}`"
     ),
+    root_path="/myrent-wrapper-api"
 )
 
 # ---- CORS (aperto) ----------------------------------------------------------
