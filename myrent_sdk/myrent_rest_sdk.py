@@ -135,9 +135,9 @@ class MyRentClient:
 # ESEMPIO D’USO                                                          #
 # ---------------------------------------------------------------------- #
 if __name__ == "__main__":
-    USER_ID = "..."
-    PASSWORD = "..."
-    COMPANY_CODE = "..."          # tenant
+    USER_ID = "...."
+    PASSWORD = "...."
+    COMPANY_CODE = "....."          # tenant
     CHANNEL = "WEB001"            # listino da usare
 
     client = MyRentClient()
@@ -167,7 +167,7 @@ if __name__ == "__main__":
     )
     print("Preventivo:", quotes)
 
-    # 4. Booking minimo (usa il primo codice veicolo disponibile se presente)
+    """# 4. Booking minimo (usa il primo codice veicolo disponibile se presente)
     vehicles = quotes["data"]["Vehicles"]
     vehicle_code = vehicles[0]["Vehicle"]["Code"] if vehicles else "A"  # fallback
 
@@ -180,4 +180,4 @@ if __name__ == "__main__":
         vehicle_code=vehicle_code,
         channel=CHANNEL,
     )
-    print("Prenotazione:", booking_resp)
+    print("Prenotazione:", booking_resp)"""
