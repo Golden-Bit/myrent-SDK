@@ -99,6 +99,12 @@ class BookingVehicle(BaseModel):
     }
     """
 
+    id: Optional[Union[int, str]] = Field(
+        None,
+        description="ID univoco del gruppo/veicolo (dal file vehicles.json). Esempi: 1, 'K-001'. Default: None."
+    )
+
+
     # Codici
     Code: str = Field(
         ...,
@@ -853,6 +859,8 @@ def build_vehicle_status(item: dict, days: int, start: datetime, end: datetime,
     status = "Available" if available else "Unavailable"
 
     veh = BookingVehicle(
+        id=item.get("id"),
+
         # codici
         Code=item["international_code"],
         national_code=item.get("national_code"),
@@ -1026,7 +1034,8 @@ class DamagePointRaw(BaseModel):
     percentage_y: Optional[float] = None
 
 class VehicleGroupRaw(BaseModel):
-    # Campi così come nel JSON originale: NON cambiare i nomi!
+    # Campi così come nel JSON originale: NON cambiare i nomi!    # ⬇️ AGGIUNGI
+    id: Optional[Union[int, str]] = None
     national_code: Optional[str] = None
     international_code: str
     description: Optional[str] = None
@@ -1125,5 +1134,25 @@ def list_vehicles(
         items=items_model,
     )
 
+@app.get(
+    "/api/v1/touroperator/vehicles/{vehicle_id}",
+    response_model=VehicleGroupRaw,
+    tags=["vehicles"],
+    summary="Dettaglio veicolo per ID",
+    description=(
+        "Ritorna un singolo veicolo del catalogo individuato per ID, così come definito nel file 'vehicles.json'.\n"
+        "Autenticazione via header `X-API-Key` o `tokenValue`."
+    ),
+)
+def get_vehicle_by_id(
+    vehicle_id: str,
+    auth: bool = Depends(require_api_key),
+):
+    groups: List[dict] = VEH_DATA.get("groups", [])
+    # confronto robusto: cast a stringa
+    found = next((g for g in groups if str(g.get("id")) == str(vehicle_id)), None)
+    if not found:
+        raise HTTPException(status_code=404, detail=f"Vehicle id '{vehicle_id}' not found")
+    return VehicleGroupRaw(**found)
 
 # Esegui: uvicorn main:app --reload --port 8000

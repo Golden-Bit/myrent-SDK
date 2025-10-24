@@ -3,6 +3,7 @@
   "vat_percentage": 22,
   "groups": [
     {
+      "id": "b1e5a9c2-7f4b-4a92-bcfd-7f2a1f35a1a1",
       "national_code": "A",
       "international_code": "MBMR",
       "description": "MINI",
@@ -20,9 +21,9 @@
       "plates": ["GF962VG"],
       "vehicle_parameters": [
         { "name": "Lunghezza esterna", "description": "3571 mm", "position": 1 },
-        { "name": "Larghezza esterna",  "description": "1627 mm", "position": 2 },
-        { "name": "Altezza esterna",    "description": "1488 mm", "position": 3 },
-        { "name": "Bagagliaio",          "description": "185 L",   "position": 4 }
+        { "name": "Larghezza esterna", "description": "1627 mm", "position": 2 },
+        { "name": "Altezza esterna", "description": "1488 mm", "position": 3 },
+        { "name": "Bagagliaio", "description": "185 L", "position": 4 }
       ],
       "damages": {
         "GF962VG": [
@@ -39,6 +40,7 @@
       }
     },
     {
+      "id": "0f8f4f33-3f1a-4d7a-9b1c-2a2a74a8dd2b",
       "national_code": "B",
       "international_code": "CCMR",
       "description": "ECONOMY",
@@ -55,6 +57,7 @@
       "locations": ["FCO", "MXP", "FLR", "PMO100", "XRJ"]
     },
     {
+      "id": "a6c3f1e7-9b2c-4d8f-8a4e-3e1c2b4f7d9a",
       "national_code": "D",
       "international_code": "CDMR",
       "description": "COMPACT MANUALE",
@@ -71,6 +74,7 @@
       "locations": ["FCO", "MXP", "FLR", "PMO100", "AHO100"]
     },
     {
+      "id": "c4d2a1b3-8e7f-4a9d-b2c1-7e5f8a3d2c9b",
       "national_code": "E",
       "international_code": "CDAR",
       "description": "COMPACT AUTOMATICO",
@@ -87,6 +91,7 @@
       "locations": ["FCO", "MXP", "FLR"]
     },
     {
+      "id": "f9a8b7c6-5d4e-4c3b-8a9f-1e2d3c4b5a6f",
       "national_code": "H",
       "international_code": "CFMR",
       "description": "SUV MEDIO MANUALE",
@@ -103,6 +108,7 @@
       "locations": ["FCO", "MXP", "FLR", "PMO100", "AHO100"]
     },
     {
+      "id": "1a2b3c4d-5e6f-4a7b-8c9d-0e1f2a3b4c5d",
       "national_code": "I",
       "international_code": "CFAR",
       "description": "SUV MEDIO AUTOMATICO",
@@ -119,6 +125,7 @@
       "locations": ["FCO", "MXP", "FLR", "PMO100"]
     },
     {
+      "id": "7e6d5c4b-3a2f-4b1e-9c8d-7a6b5c4d3e2f",
       "national_code": "K",
       "international_code": "IFAR",
       "description": "SUV GRANDE AUTOMATICO",
@@ -149,6 +156,7 @@
       }
     },
     {
+      "id": "9b8a7c6d-5e4f-4a3b-9c2d-1e0f2a3b4c5d",
       "national_code": "S",
       "international_code": "XFAR",
       "description": "LUXURY",
@@ -165,6 +173,7 @@
       "locations": ["FCO", "MXP"]
     },
     {
+      "id": "2f3e4d5c-6b7a-4c8d-9e0f-1a2b3c4d5e6f",
       "national_code": "G",
       "international_code": "ILAR",
       "description": "BERLINA AUTOMATICA",
@@ -182,6 +191,7 @@
       "plates": ["GE765TR"]
     },
     {
+      "id": "4c3b2a1f-0e9d-4c8b-7a6f-5d4e3c2b1a0f",
       "national_code": "R",
       "international_code": "FDAR",
       "description": "EXECUTIVE",
@@ -199,6 +209,7 @@
       "plates": ["FM432KL"]
     },
     {
+      "id": "e1f2a3b4-c5d6-4e7f-8a9b-0c1d2e3f4a5b",
       "national_code": "M",
       "international_code": "CWAR",
       "description": "SW-MONOVOLUME AUTOMATICO",
@@ -215,6 +226,7 @@
       "locations": ["FCO", "MXP", "FLR", "PMO100"]
     },
     {
+      "id": "5a4b3c2d-1e0f-4a9b-8c7d-6e5f4d3c2b1a",
       "national_code": "L",
       "international_code": "CWMR",
       "description": "SW-MONOVOLUME MANUALE",
@@ -231,6 +243,7 @@
       "locations": ["FCO", "MXP", "FLR", "PMO100", "AHO100"]
     },
     {
+      "id": "8f7e6d5c-4b3a-4c2d-9e1f-0a9b8c7d6e5f",
       "national_code": "O",
       "international_code": "SVAR",
       "description": "MINIVAN (5+2) AUTOMATICO",
@@ -247,6 +260,7 @@
       "locations": ["FCO", "MXP", "FLR"]
     },
     {
+      "id": "0a1b2c3d-4e5f-4a6b-8c9d-1e2f3a4b5c6d",
       "national_code": "P",
       "international_code": "PVAR",
       "description": "MINIBUS 9 POSTI AUTOMATICO",
@@ -264,6 +278,7 @@
       "plates": ["AA123BB"]
     },
     {
+      "id": "6d5c4b3a-2f1e-4d8c-9b0a-1c2d3e4f5a6b",
       "national_code": "U",
       "international_code": "CCAH",
       "description": "ELECTRIC CAR",
@@ -281,6 +296,7 @@
       "plates": ["EV001IT"]
     },
     {
+      "id": "3e2d1c0b-9a8f-4d7c-6b5a-4c3d2e1f0a9b",
       "national_code": "X",
       "international_code": "EKMR",
       "description": "FURGONE PICCOLO",
@@ -297,6 +313,7 @@
       "locations": ["FCO", "MXP", "PMO100", "AHO100"]
     },
     {
+      "id": "ad2b91f8-3c4d-4e5f-8a7b-9c0d1e2f3a4b",
       "national_code": "Y",
       "international_code": "FKMR",
       "description": "FURGONE GRANDE",

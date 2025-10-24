@@ -8,10 +8,21 @@ import sys
 from collections import Counter
 
 # ================== CONFIG FISSA ==================
-BASE_URL = "http://localhost:8333"     # modifica se il server gira altrove (es. 8000)
-API_KEY  = "MYRENT-DEMO-KEY"           # chiave mock fissa come nel server
-TIMEOUT  = 15.0                        # secondi per timeout HTTP
+BASE_URL  = "http://localhost:8333"      # es. http://localhost:8000 se serve
+ROOT_PATH = "/myrent-wrapper-api"        # come nel server FastAPI (root_path)
+API_KEY   = "MYRENT-DEMO-KEY"            # chiave mock fissa come nel server
+TIMEOUT   = 15.0                         # secondi per timeout HTTP
 # =================================================
+
+def api_url(path: str) -> str:
+    """
+    Compose full URL honoring ROOT_PATH without duplicating slashes.
+    path must start with '/' (e.g. '/health', '/api/v1/...').
+    """
+    base = BASE_URL.rstrip("/")
+    root = ROOT_PATH.strip("/")
+    p = path.lstrip("/")
+    return f"{base}/{root}/{p}" if root else f"{base}/{p}"
 
 def jprint(obj):
     print(json.dumps(obj, indent=2, ensure_ascii=False))
@@ -40,16 +51,20 @@ def get_calc(vs: dict):
         return {}
 
 def short_vehicle_row(vs: dict):
+    """
+    Ritorna una riga compatta per veicoli di /quotations,
+    includendo anche Vehicle.id se presente.
+    """
     calc = get_calc(vs)
     v = vs.get("Vehicle", {})
+    vid = v.get("id")
     code = v.get("Code")
-    # il backend usa "VehMakeModel"; aggiungo fallback "veh_make_models" per robustezza
     vmms = v.get("VehMakeModel") or v.get("veh_make_models")
-    name = vmms[0].get("Name") if isinstance(vmms, list) and vmms else None
+    name = vmms[0].get("Name") if isinstance(vmms, list) and vmms else v.get("model")
     status = vs.get("Status")
     total = calc.get("total")
     base_daily = calc.get("base_daily")
-    return f"[{status}] {code} - {name} | base_daily={base_daily} | total={total}"
+    return f"[{status}] id={vid} {code} - {name} | base_daily={base_daily} | total={total}"
 
 # ---------- Helpers grafici/ASCII ----------
 def _truncate(s, maxlen):
@@ -87,7 +102,7 @@ def print_bar_chart(counter: Counter, title: str, width: int = 40):
 # ------------------ TESTS ESISTENTI ------------------
 def test_health():
     hrule("TEST: /health")
-    url = f"{BASE_URL}/health"
+    url = api_url("/health")
     r = requests.get(url, headers=header(), timeout=TIMEOUT)
     print(f"GET {url} -> {r.status_code}")
     r.raise_for_status()
@@ -95,7 +110,7 @@ def test_health():
 
 def test_locations():
     hrule("TEST: /api/v1/touroperator/locations")
-    url = f"{BASE_URL}/api/v1/touroperator/locations"
+    url = api_url("/api/v1/touroperator/locations")
     r = requests.get(url, headers=header(), timeout=TIMEOUT)
     print(f"GET {url} -> {r.status_code}")
     r.raise_for_status()
@@ -138,9 +153,33 @@ def make_quote_payload(pickup="FCO", dropoff="MXP", days=3, start_hour=10, end_h
     }
     return payload
 
+def assert_quotation_ids(resp_json: dict):
+    """
+    Controlla che ogni Vehicle di /quotations abbia 'id' popolato.
+    Stampa un mini-report e ritorna lista di (id, code, name).
+    """
+    d = resp_json.get("data", {}) if isinstance(resp_json, dict) else {}
+    vehicles = d.get("Vehicles", [])
+    missing = 0
+    summary = []
+    for vs in vehicles:
+        v = vs.get("Vehicle", {})
+        vid = v.get("id")
+        code = v.get("Code")
+        vmms = v.get("VehMakeModel") or v.get("veh_make_models")
+        name = vmms[0].get("Name") if isinstance(vmms, list) and vmms else v.get("model")
+        summary.append((vid, code, name))
+        if vid in (None, ""):
+            missing += 1
+    if missing == 0:
+        print("✔ Tutti i veicoli in /quotations hanno un 'id'.")
+    else:
+        print(f"✘ ATTENZIONE: {missing} veicoli in /quotations senza 'id'.")
+    return summary
+
 def test_quotations(payload, title):
     hrule(f"TEST: /api/v1/touroperator/quotations — {title}")
-    url = f"{BASE_URL}/api/v1/touroperator/quotations"
+    url = api_url("/api/v1/touroperator/quotations")
     r = requests.post(url, headers=header(), data=json.dumps(payload), timeout=TIMEOUT)
     print(f"POST {url} -> {r.status_code}")
     r.raise_for_status()
@@ -160,11 +199,14 @@ def test_quotations(payload, title):
     print("\nTop 5 veicoli (se disponibili):")
     for vs in vehicles[:5]:
         print("  -", short_vehicle_row(vs))
+
+    # verifica presenza ID
+    assert_quotation_ids(data)
     return data
 
 def test_damages(plate="GF962VG"):
     hrule(f"TEST: /api/v1/touroperator/damages/{plate}")
-    url = f"{BASE_URL}/api/v1/touroperator/damages/{plate}"
+    url = api_url(f"/api/v1/touroperator/damages/{plate}")
     r = requests.get(url, headers=header(), timeout=TIMEOUT)
     print(f"GET {url} -> {r.status_code}")
     r.raise_for_status()
@@ -178,7 +220,7 @@ def test_damages(plate="GF962VG"):
 # ------------------ NUOVO: TEST CATALOGO VEICOLI ------------------
 
 def fetch_vehicles_page(location=None, skip=0, page_size=25):
-    url = f"{BASE_URL}/api/v1/touroperator/vehicles"
+    url = api_url("/api/v1/touroperator/vehicles")
     params = {"skip": skip, "page_size": page_size}
     if location:
         params["location"] = location
@@ -187,10 +229,18 @@ def fetch_vehicles_page(location=None, skip=0, page_size=25):
     r.raise_for_status()
     return r.json()
 
+def fetch_vehicle_by_id(vehicle_id):
+    url = api_url(f"/api/v1/touroperator/vehicles/{vehicle_id}")
+    r = requests.get(url, headers=header(), timeout=TIMEOUT)
+    print(f"GET {r.url} -> {r.status_code}")
+    r.raise_for_status()
+    return r.json()
+
 def page_table_rows(items):
     rows = []
     for g in items:
         rows.append([
+            str(g.get("id", "")),
             g.get("international_code", ""),
             g.get("display_name", ""),
             g.get("vendor_macro", ""),
@@ -205,7 +255,7 @@ def test_catalog(location=None, page_size=5):
     hrule(f"TEST: /api/v1/touroperator/vehicles — {label} — page_size={page_size}")
 
     all_items = []
-    seen_ids = set()  # per sicurezza, dedup su 'international_code' + 'display_name'
+    seen_keys = set()  # dedup preferibilmente per id; se mancante, fallback su codice+nome
     skip = 0
 
     while True:
@@ -214,22 +264,25 @@ def test_catalog(location=None, page_size=5):
         items = data.get("items", [])
         has_next = bool(data.get("has_next"))
         next_skip = data.get("next_skip")
-        prev_skip = data.get("prev_skip")
 
         print(f"Pagina: skip={data.get('skip')} size={data.get('page_size')} "
               f"items={len(items)} total={total} has_next={has_next}")
 
         # tabella compatta per la pagina
-        headers = ["ACRISS", "Display name", "Macro", "Type", "€/day", "Locations"]
-        widths  = [8, 30, 10, 10, 8, 25]
+        headers = ["ID", "ACRISS", "Display name", "Macro", "Type", "€/day", "Locations"]
+        widths  = [8, 8, 30, 12, 10, 8, 25]
         rows = page_table_rows(items)
         print_table(headers, rows, widths)
 
         # accumulo + dedup
         for g in items:
-            key = f"{g.get('international_code')}|{g.get('display_name')}"
-            if key not in seen_ids:
-                seen_ids.add(key)
+            gid = g.get("id")
+            if gid not in (None, ""):
+                key = f"id:{gid}"
+            else:
+                key = f"{g.get('international_code')}|{g.get('display_name')}"
+            if key not in seen_keys:
+                seen_keys.add(key)
                 all_items.append(g)
 
         if not has_next:
@@ -251,6 +304,31 @@ def test_catalog(location=None, page_size=5):
 
     return all_items
 
+def test_vehicle_detail_by_id(pick_ids):
+    """
+    Esercita /api/v1/touroperator/vehicles/{id} su una piccola selezione di id.
+    Stampa risultato e fa un mini-confronto con la voce catalogo (se passata come dict).
+    """
+    hrule("TEST: /api/v1/touroperator/vehicles/{id} — dettaglio per ID")
+    results = []
+    for pid in pick_ids:
+        print(f"\nRichiedo dettaglio per id={pid}")
+        detail = fetch_vehicle_by_id(pid)
+        # stampa compatta + JSON completo
+        compact = {
+            "id": detail.get("id"),
+            "international_code": detail.get("international_code"),
+            "display_name": detail.get("display_name"),
+            "locations": detail.get("locations"),
+            "daily_rate": detail.get("daily_rate"),
+        }
+        print("Compatto:")
+        jprint(compact)
+        print("JSON completo:")
+        jprint(detail)
+        results.append(detail)
+    return results
+
 # ------------------ MAIN ------------------
 def main():
     try:
@@ -263,43 +341,50 @@ def main():
         pickup = "FCO" if "FCO" in codes else (codes[0] if codes else "FCO")
         dropoff = "MXP" if "MXP" in codes else (codes[-1] if codes else "MXP")
 
-        # 3) quotations — base
+        # 3) vehicles catalog — tutte le location, page_size piccolo per mostrare la paginazione
+        all_items_no_filter = test_catalog(location=None, page_size=5)
+
+        # 4) vehicles catalog — filtro per location (es. FCO)
+        all_items_fco = test_catalog(location="FCO", page_size=4)
+
+        # 5) detail by id — prendo 2-3 id dal catalogo generale e chiamo l'endpoint di dettaglio
+        sample_ids = [g.get("id") for g in all_items_no_filter if g.get("id") is not None][:3]
+        if sample_ids:
+            test_vehicle_detail_by_id(sample_ids)
+        else:
+            print("⚠ Nessun 'id' trovato nel catalogo per il test dettaglio per id.")
+
+        # 6) quotations — base
         payload_base = make_quote_payload(
             pickup=pickup, dropoff=dropoff, days=3, start_hour=10, end_hour=12,
             channel="WEB_DEMO", age=30, show_pics=True, macro_desc=None, show_params=False
         )
-        test_quotations(payload_base, "BASE (web channel, 30 anni)")
+        test_quotations(payload_base, "BASE (web channel, 30 anni) — verifica id nei veicoli")
 
-        # 4) quotations — filtro macroDescription (SUV)
+        # 7) quotations — filtro macroDescription (SUV) + parametri veicolo
         payload_suv = make_quote_payload(
             pickup=pickup, dropoff=dropoff, days=4, start_hour=11, end_hour=9,
             channel="WEB_DEMO", age=35, show_pics=True, macro_desc="SUV", show_params=True
         )
-        test_quotations(payload_suv, "Filtro macroDescription = SUV + parametri veicolo")
+        test_quotations(payload_suv, "Filtro macroDescription = SUV + parametri veicolo — verifica id")
 
-        # 5) quotations — fuori orario (fee out-of-hours)
+        # 8) quotations — fuori orario (fee out-of-hours)
         payload_foh = make_quote_payload(
             pickup=pickup, dropoff=dropoff, days=2, start_hour=10, end_hour=10,
             channel="WEB_DEMO", age=40, show_pics=False, macro_desc=None, show_params=False,
             out_of_hours=True
         )
-        test_quotations(payload_foh, "Pick-up fuori orario (fee)")
+        test_quotations(payload_foh, "Pick-up fuori orario (fee) — verifica id")
 
-        # 6) quotations — giovane guidatore (surcharge)
+        # 9) quotations — giovane guidatore (surcharge)
         payload_young = make_quote_payload(
             pickup=pickup, dropoff=dropoff, days=5, start_hour=9, end_hour=10,
             channel="WEB_DEMO", age=22, show_pics=True, macro_desc="COMPACT", show_params=False
         )
-        test_quotations(payload_young, "Giovane guidatore (22 anni) + COMPACT")
+        test_quotations(payload_young, "Giovane guidatore (22 anni) + COMPACT — verifica id")
 
-        # 7) damages — targa presente nei dati demo
+        # 10) damages — targa presente nei dati demo
         test_damages("GF962VG")
-
-        # 8) vehicles catalog — tutte le location, page_size piccolo per mostrare la paginazione
-        test_catalog(location=None, page_size=5)
-
-        # 9) vehicles catalog — filtro per location (es. FCO)
-        test_catalog(location="FCO", page_size=4)
 
         hrule("DEMO COMPLETATA ✅")
         print("Tutti i test sono stati eseguiti senza eccezioni.")
