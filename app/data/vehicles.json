@@ -15,7 +15,7 @@
       "transmission": "M",
       "fuel": "PETROL",
       "aircon": true,
-      "image_url": "https://www.romanoautomobili.it/wp-content/uploads/2017/02/nuova-fiat-500-club-noleggio-lungo-termine.jpg",
+      "image_url": "https://raw.githubusercontent.com/Golden-Bit/myrent-SDK/refs/heads/main/data/nuova-fiat-500-club-noleggio-lungo-termine.jpg",
       "daily_rate": 32.0,
       "locations": ["FCO", "MXP", "FLR", "PMO100", "AHO100", "XRJ"],
       "plates": ["GF962VG"],
@@ -52,7 +52,7 @@
       "transmission": "M",
       "fuel": "PETROL",
       "aircon": true,
-      "image_url": "https://www.romanoautomobili.it/wp-content/uploads/2017/02/nuova-fiat-500-club-noleggio-lungo-termine.jpg",
+      "image_url": "https://raw.githubusercontent.com/Golden-Bit/myrent-SDK/refs/heads/main/data/nuova-fiat-500-club-noleggio-lungo-termine.jpg",
       "daily_rate": 38.0,
       "locations": ["FCO", "MXP", "FLR", "PMO100", "XRJ"]
     },
@@ -69,7 +69,7 @@
       "transmission": "M",
       "fuel": "PETROL",
       "aircon": true,
-      "image_url": "https://www.romanoautomobili.it/wp-content/uploads/2017/02/nuova-fiat-500-club-noleggio-lungo-termine.jpg",
+      "image_url": "https://raw.githubusercontent.com/Golden-Bit/myrent-SDK/refs/heads/main/data/nuova-fiat-500-club-noleggio-lungo-termine.jpg",
       "daily_rate": 46.0,
       "locations": ["FCO", "MXP", "FLR", "PMO100", "AHO100"]
     },
@@ -86,7 +86,7 @@
       "transmission": "A",
       "fuel": "PETROL",
       "aircon": true,
-      "image_url": "https://www.romanoautomobili.it/wp-content/uploads/2017/02/nuova-fiat-500-club-noleggio-lungo-termine.jpg",
+      "image_url": "https://raw.githubusercontent.com/Golden-Bit/myrent-SDK/refs/heads/main/data/nuova-fiat-500-club-noleggio-lungo-termine.jpg",
       "daily_rate": 52.0,
       "locations": ["FCO", "MXP", "FLR"]
     },
@@ -103,7 +103,7 @@
       "transmission": "M",
       "fuel": "DIESEL",
       "aircon": true,
-      "image_url": "https://www.romanoautomobili.it/wp-content/uploads/2017/02/nuova-fiat-500-club-noleggio-lungo-termine.jpg",
+      "image_url": "https://raw.githubusercontent.com/Golden-Bit/myrent-SDK/refs/heads/main/data/nuova-fiat-500-club-noleggio-lungo-termine.jpg",
       "daily_rate": 64.0,
       "locations": ["FCO", "MXP", "FLR", "PMO100", "AHO100"]
     },
@@ -120,7 +120,7 @@
       "transmission": "A",
       "fuel": "DIESEL",
       "aircon": true,
-      "image_url": "https://www.romanoautomobili.it/wp-content/uploads/2017/02/nuova-fiat-500-club-noleggio-lungo-termine.jpg",
+      "image_url": "https://raw.githubusercontent.com/Golden-Bit/myrent-SDK/refs/heads/main/data/nuova-fiat-500-club-noleggio-lungo-termine.jpg",
       "daily_rate": 72.0,
       "locations": ["FCO", "MXP", "FLR", "PMO100"]
     },
@@ -137,7 +137,7 @@
       "transmission": "A",
       "fuel": "DIESEL",
       "aircon": true,
-      "image_url": "https://www.romanoautomobili.it/wp-content/uploads/2017/02/nuova-fiat-500-club-noleggio-lungo-termine.jpg",
+      "image_url": "https://raw.githubusercontent.com/Golden-Bit/myrent-SDK/refs/heads/main/data/nuova-fiat-500-club-noleggio-lungo-termine.jpg",
       "daily_rate": 88.0,
       "locations": ["FCO", "MXP", "FLR"],
       "plates": ["FT233AP"],
@@ -168,7 +168,7 @@
       "transmission": "A",
       "fuel": "DIESEL",
       "aircon": true,
-      "image_url": "https://www.romanoautomobili.it/wp-content/uploads/2017/02/nuova-fiat-500-club-noleggio-lungo-termine.jpg",
+      "image_url": "https://raw.githubusercontent.com/Golden-Bit/myrent-SDK/refs/heads/main/data/nuova-fiat-500-club-noleggio-lungo-termine.jpg",
       "daily_rate": 140.0,
       "locations": ["FCO", "MXP"]
     },
@@ -185,7 +185,7 @@
       "transmission": "A",
       "fuel": "DIESEL",
       "aircon": true,
-      "image_url": "https://www.romanoautomobili.it/wp-content/uploads/2017/02/nuova-fiat-500-club-noleggio-lungo-termine.jpg",
+      "image_url": "https://raw.githubusercontent.com/Golden-Bit/myrent-SDK/refs/heads/main/data/nuova-fiat-500-club-noleggio-lungo-termine.jpg",
       "daily_rate": 78.0,
       "locations": ["FCO", "MXP", "FLR"],
       "plates": ["GE765TR"]
@@ -203,7 +203,7 @@
       "transmission": "A",
       "fuel": "DIESEL",
       "aircon": true,
-      "image_url": "https://www.romanoautomobili.it/wp-content/uploads/2017/02/nuova-fiat-500-club-noleggio-lungo-termine.jpg",
+      "image_url": "https://raw.githubusercontent.com/Golden-Bit/myrent-SDK/refs/heads/main/data/nuova-fiat-500-club-noleggio-lungo-termine.jpg",
       "daily_rate": 110.0,
       "locations": ["FCO", "MXP"],
       "plates": ["FM432KL"]
@@ -221,7 +221,7 @@
       "transmission": "A",
       "fuel": "DIESEL",
       "aircon": true,
-      "image_url": "https://www.romanoautomobili.it/wp-content/uploads/2017/02/nuova-fiat-500-club-noleggio-lungo-termine.jpg",
+      "image_url": "https://raw.githubusercontent.com/Golden-Bit/myrent-SDK/refs/heads/main/data/nuova-fiat-500-club-noleggio-lungo-termine.jpg",
       "daily_rate": 58.0,
       "locations": ["FCO", "MXP", "FLR", "PMO100"]
     },
@@ -238,7 +238,7 @@
       "transmission": "M",
       "fuel": "DIESEL",
       "aircon": true,
-      "image_url": "https://www.romanoautomobili.it/wp-content/uploads/2017/02/nuova-fiat-500-club-noleggio-lungo-termine.jpg",
+      "image_url": "https://raw.githubusercontent.com/Golden-Bit/myrent-SDK/refs/heads/main/data/nuova-fiat-500-club-noleggio-lungo-termine.jpg",
       "daily_rate": 52.0,
       "locations": ["FCO", "MXP", "FLR", "PMO100", "AHO100"]
     },
@@ -255,7 +255,7 @@
       "transmission": "A",
       "fuel": "DIESEL",
       "aircon": true,
-      "image_url": "https://www.romanoautomobili.it/wp-content/uploads/2017/02/nuova-fiat-500-club-noleggio-lungo-termine.jpg",
+      "image_url": "https://raw.githubusercontent.com/Golden-Bit/myrent-SDK/refs/heads/main/data/nuova-fiat-500-club-noleggio-lungo-termine.jpg",
       "daily_rate": 84.0,
       "locations": ["FCO", "MXP", "FLR"]
     },
@@ -272,7 +272,7 @@
       "transmission": "A",
       "fuel": "DIESEL",
       "aircon": true,
-      "image_url": "https://www.romanoautomobili.it/wp-content/uploads/2017/02/nuova-fiat-500-club-noleggio-lungo-termine.jpg",
+      "image_url": "https://raw.githubusercontent.com/Golden-Bit/myrent-SDK/refs/heads/main/data/nuova-fiat-500-club-noleggio-lungo-termine.jpg",
       "daily_rate": 95.0,
       "locations": ["FCO", "MXP", "FLR", "PMO100"],
       "plates": ["AA123BB"]
@@ -290,7 +290,7 @@
       "transmission": "A",
       "fuel": "ELECTRIC",
       "aircon": true,
-      "image_url": "https://www.romanoautomobili.it/wp-content/uploads/2017/02/nuova-fiat-500-club-noleggio-lungo-termine.jpg",
+      "image_url": "https://raw.githubusercontent.com/Golden-Bit/myrent-SDK/refs/heads/main/data/nuova-fiat-500-club-noleggio-lungo-termine.jpg",
       "daily_rate": 56.0,
       "locations": ["FCO", "MXP", "FLR", "XRJ"],
       "plates": ["EV001IT"]
@@ -308,7 +308,7 @@
       "transmission": "M",
       "fuel": "DIESEL",
       "aircon": true,
-      "image_url": "https://www.romanoautomobili.it/wp-content/uploads/2017/02/nuova-fiat-500-club-noleggio-lungo-termine.jpg",
+      "image_url": "https://raw.githubusercontent.com/Golden-Bit/myrent-SDK/refs/heads/main/data/nuova-fiat-500-club-noleggio-lungo-termine.jpg",
       "daily_rate": 54.0,
       "locations": ["FCO", "MXP", "PMO100", "AHO100"]
     },
@@ -325,7 +325,7 @@
       "transmission": "M",
       "fuel": "DIESEL",
       "aircon": true,
-      "image_url": "https://www.romanoautomobili.it/wp-content/uploads/2017/02/nuova-fiat-500-club-noleggio-lungo-termine.jpg",
+      "image_url": "https://raw.githubusercontent.com/Golden-Bit/myrent-SDK/refs/heads/main/data/nuova-fiat-500-club-noleggio-lungo-termine.jpg",
       "daily_rate": 82.0,
       "locations": ["FCO", "MXP", "PMO100"]
     }
