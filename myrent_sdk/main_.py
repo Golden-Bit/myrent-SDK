@@ -1,19 +1,14 @@
 # myrent_sdk.py
-# SDK MyRent (Authentication + Locations + Quotations) con SCHEMI tipizzati e fix su:
-# - Formato date con secondi "YYYY-MM-DDTHH:MM:SS"
-# - Normalizzazione channel (niente spazi) + fallback a company_code
-# - Gestione agreementCoupon come STRING/opzionale
-# - Messaggistica d’errore più chiara per Code 366 ("Not accepting connections")
+# SDK MyRent (Authentication + Locations + Quotations) con SCHEMI tipizzati
 from __future__ import annotations
 
 from dataclasses import dataclass, field, asdict
 from typing import Any, Dict, List, Optional, Union
-from datetime import datetime
 import time
 import json
 import logging
-import re
 import requests
+from datetime import datetime
 
 
 __all__ = [
@@ -49,19 +44,15 @@ class APIError(MyRentError):
 
 
 # =====================================================================================
-# Helper di parsing e normalizzazione
+# Helper di parsing
 # =====================================================================================
-
-_ISO_NO_SECONDS = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$")
-_ISO_WITH_SECONDS = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}$")
-
 
 def _normalize_base_url(base_url: str) -> str:
     return base_url.rstrip("/")
 
 
 def _coerce_bool(v: Any) -> Optional[bool]:
-    """Converte true/false (bool, number, string) in bool. Restituisce None se non interpretabile."""
+    """Converte true/false (bool o string) in bool. Restituisce None se non interpretabile."""
     if v is None:
         return None
     if isinstance(v, bool):
@@ -93,36 +84,14 @@ def _coerce_int(v: Any) -> Optional[int]:
         return None
 
 
-def _fmt_dt_iso_seconds(dt: Union[str, datetime]) -> str:
+def _fmt_dt_iso(dt: Union[str, datetime]) -> str:
+    """Rende sicuro il formato datetime in stringa.
+    - Se è già una stringa, la ritorna com’è (si assume conforme a ciò che MyRent si aspetta).
+    - Se è datetime, la formatta come 'YYYY-MM-DDTHH:MM' (ISO 'short'), comune negli swagger.
     """
-    Rende sicuro il formato datetime in stringa **con secondi**:
-      - Se è datetime -> 'YYYY-MM-DDTHH:MM:SS'
-      - Se è stringa:
-          * se è già con i secondi la ritorna com'è
-          * se è in forma 'YYYY-MM-DDTHH:MM' aggiunge ':00'
-          * altrimenti la ritorna com'è (si assume valida per l'API)
-    """
-    if isinstance(dt, datetime):
-        return dt.replace(microsecond=0).strftime("%Y-%m-%dT%H:%M:%S")
     if isinstance(dt, str):
-        s = dt.strip()
-        if _ISO_WITH_SECONDS.match(s):
-            return s
-        if _ISO_NO_SECONDS.match(s):
-            return f"{s}:00"
-        return s
-    raise TypeError("start_date/end_date devono essere str o datetime")
-
-
-def _sanitize_channel(channel: Optional[str]) -> Optional[str]:
-    """
-    Normalizza il channel rimuovendo **tutti** gli spazi.
-    Esempio: 'RENTAL _PREMIUM_PREPAID' -> 'RENTAL_PREMIUM_PREPAID'
-    """
-    if channel is None:
-        return None
-    new_value = channel.replace(" ", "")
-    return new_value
+        return dt
+    return dt.strftime("%Y-%m-%dT%H:%M")
 
 
 # =====================================================================================
@@ -179,17 +148,13 @@ class OpeningHours:
 
     @staticmethod
     def from_api_dict(d: Dict[str, Any]) -> "OpeningHours":
-        # accetta sia 'dropoffendTime' che 'dropoffEndTime'
-        dropoff_end = d.get("dropoffendTime")
-        if dropoff_end is None:
-            dropoff_end = d.get("dropoffEndTime")
         return OpeningHours(
             day_of_the_week=_coerce_int(d.get("dayOfTheWeek")),
             day_of_the_week_name=d.get("dayOfTheWeekName"),
             start_time=d.get("startTime"),
             end_time=d.get("endTime"),
             dropoff_start_time=d.get("dropoffStartTime"),
-            dropoff_end_time=dropoff_end,
+            dropoff_end_time=d.get("dropoffendTime"),
             is_valid_period=_coerce_bool(d.get("isValidPeriod")),
             valid_from=d.get("validFrom"),
             valid_to=d.get("validTo"),
@@ -202,7 +167,7 @@ class OpeningHours:
             "startTime": self.start_time,
             "endTime": self.end_time,
             "dropoffStartTime": self.dropoff_start_time,
-            "dropoffendTime": self.dropoff_end_time,  # coerente con payload osservato
+            "dropoffendTime": self.dropoff_end_time,
             "isValidPeriod": self.is_valid_period,
             "validFrom": self.valid_from,
             "validTo": self.valid_to,
@@ -344,20 +309,19 @@ class LocationType:
 # =====================================================================================
 # SCHEMI (Quotations)
 # =====================================================================================
-
 @dataclass
 class QuotationRequest:
     """Schema **input** per POST /api/v1/touroperator/quotations.
 
     Campi minimi:
     - pickupLocation, dropOffLocation: codici location
-    - startDate, endDate: stringa o datetime (verranno forzati a 'YYYY-MM-DDTHH:MM:SS')
+    - startDate, endDate: stringa o datetime
     - age: età conducente
-    - channel: opzionale -> se non fornito, lo SDK userà company_code (normalizzato)
+    - channel: opzionale -> se non fornito, lo SDK userà company_code
 
     Campi opzionali (boolean/string) come da Swagger:
     showPics, showOptionalImage, showVehicleParameter, showVehicleExtraImage,
-    agreementCoupon (STRING!), discountValueWithoutVat, macroDescription, showBookingDiscount,
+    agreementCoupon, discountValueWithoutVat, macroDescription, showBookingDiscount,
     isYoungDriverAge, isSeniorDriverAge
     """
     drop_off_location: str
@@ -365,14 +329,13 @@ class QuotationRequest:
     pickup_location: str
     start_date: Union[str, datetime]
     age: int
-    channel: Optional[str] = None  # verrà normalizzato (spazi rimossi)
+    channel: Optional[str] = None  # <<<<< qui: ora è opzionale
 
     show_pics: Optional[bool] = None
     show_optional_image: Optional[bool] = None
     show_vehicle_parameter: Optional[bool] = None
     show_vehicle_extra_image: Optional[bool] = None
-    # agreementCoupon è STRING in MyRent: se vuoto/None, viene omesso
-    agreement_coupon: Optional[Union[str, bool]] = None
+    agreement_coupon: Optional[bool] = None
     discount_value_without_vat: Optional[str] = None
     macro_description: Optional[str] = None
     show_booking_discount: Optional[bool] = None
@@ -382,52 +345,44 @@ class QuotationRequest:
     def to_payload(self) -> Dict[str, Any]:
         payload: Dict[str, Any] = {
             "dropOffLocation": self.drop_off_location,
-            "endDate": _fmt_dt_iso_seconds(self.end_date),
+            "endDate": _fmt_dt_iso(self.end_date),
             "pickupLocation": self.pickup_location,
-            "startDate": _fmt_dt_iso_seconds(self.start_date),
+            "startDate": _fmt_dt_iso(self.start_date),
             "age": int(self.age),
         }
-
-        # channel: se fornito, normalizza rimuovendo spazi
         if self.channel is not None:
-            payload["channel"] = _sanitize_channel(self.channel)
-
-        # Opzionali
+            payload["channel"] = self.channel  # se lo hai passato esplicitamente
         opt_map: Dict[str, Any] = {
             "showPics": self.show_pics,
             "showOptionalImage": self.show_optional_image,
             "showVehicleParameter": self.show_vehicle_parameter,
             "showVehicleExtraImage": self.show_vehicle_extra_image,
-            # agreementCoupon: includi SOLO se è una stringa non vuota
-            # (se l'utente avesse passato True/False, lo ignoriamo come suggerito dal supporto)
+            "agreementCoupon": self.agreement_coupon,
             "discountValueWithoutVat": self.discount_value_without_vat,
             "macroDescription": self.macro_description,
             "showBookingDiscount": self.show_booking_discount,
-            # Preferiamo la forma corretta 'isYoungDriverAge' ma includiamo anche la variante osservata
-            "isYoungDriverAge": self.is_young_driver_age,
+            "isyoungDriverAge": self.is_young_driver_age,   # in alcune istanze minuscolo
             "isSeniorDriverAge": self.is_senior_driver_age,
         }
-
-        # agreementCoupon: gestiscilo a parte
-        if isinstance(self.agreement_coupon, str):
-            if self.agreement_coupon.strip():
-                payload["agreementCoupon"] = self.agreement_coupon.strip()
-        # Se è bool o altro, lo omettiamo per aderire al consiglio del supporto
-
         for k, v in opt_map.items():
             if v is not None:
                 payload[k] = v
-
-        # Per compatibilità con alcuni swagger che usano 'isyoungDriverAge'
-        if self.is_young_driver_age is not None:
-            payload["isyoungDriverAge"] = self.is_young_driver_age  # variante tollerante
-
         return payload
 
 
 @dataclass(frozen=True)
 class QuotationItem:
-    """Schema **output** per un elemento della lista `quotation` nella risposta."""
+    """Schema **output** per un elemento della lista `quotation` nella risposta.
+
+    Campi principali (dagli screenshot):
+    - total: int
+    - PickUpLocation: str
+    - ReturnLocation: str
+    - PickUpDateTime: str
+    - ReturnDateTime: str
+    - Vehicles: List[Dict[str, Any]]     (libero per ora)
+    - optionals: List[Dict[str, Any]]    (libero per ora)
+    """
     total: Optional[int] = None
     pick_up_location: Optional[str] = None
     return_location: Optional[str] = None
@@ -491,6 +446,8 @@ class QuotationResponse:
         # Formati possibili:
         # { "data": {...} }
         # { "status": true, "message": "...", "data": {...} }
+        # In alcuni casi gli swagger mostrano "quotationResponse" come etichetta,
+        # ma nel JSON reale la root è tipicamente { data: {...} }.
         data_obj = payload.get("data") or payload.get("Data") or {}
         qdata = QuotationData.from_api_dict(data_obj if isinstance(data_obj, dict) else {})
         return QuotationResponse(data=qdata, raw=payload)
@@ -552,7 +509,7 @@ class MyRentClient:
         self.timeout = float(timeout)
         self.max_retries = int(max_retries)
         self.backoff_factor = float(backoff_factor)
-        self.user_agent = user_agent or "myrent-sdk/0.4"
+        self.user_agent = user_agent or "myrent-sdk/0.3"
         self.log = logger or logging.getLogger("myrent_sdk")
         if not self.log.handlers:
             handler = logging.StreamHandler()
@@ -563,11 +520,7 @@ class MyRentClient:
 
     # -------------------- HTTP low-level --------------------
     def _headers(self, extra: Optional[Dict[str, str]] = None) -> Dict[str, str]:
-        h = {
-            "User-Agent": self.user_agent,
-            "Accept": "application/json",
-            "Content-Type": "application/json",
-        }
+        h = {"User-Agent": self.user_agent, "Accept": "application/json"}
         if extra:
             h.update(extra)
         return h
@@ -589,7 +542,7 @@ class MyRentClient:
         url = self.base_url + path
         attempt = 0
         last_exc: Optional[Exception] = None
-        print(json.dumps(json_body, indent=2))
+
         while attempt <= self.max_retries:
             try:
                 resp = self.session.request(
@@ -603,13 +556,11 @@ class MyRentClient:
                 if 200 <= resp.status_code < 300:
                     return resp
 
-                # 429 o 5xx -> retry con backoff
                 if resp.status_code in (429,) or 500 <= resp.status_code < 600:
                     self._sleep_backoff(attempt)
                     attempt += 1
                     continue
 
-                # errori non retryable
                 try:
                     payload = resp.json()
                 except Exception:
@@ -689,62 +640,37 @@ class MyRentClient:
 
     # -------------------- Quotations --------------------
     def get_quotations(self, request: QuotationRequest) -> QuotationResponse:
-        """
-        Esegue una quotazione.
+        """Esegue una quotazione.
 
         Header: tokenValue
         Body:   vedi QuotationRequest.to_payload()
         Output: QuotationResponse (data.quotation, data.TotalCharge)
-
-        Fix inclusi:
-          - startDate/endDate forzati con secondi
-          - normalizzazione channel (rimozione spazi)
-          - omissione agreementCoupon se non stringa
-          - messaggio esplicativo per error code 366
         """
         headers = {"tokenValue": self.token_value}
 
+        # Costruisci payload e, se channel non è stato passato, imposta company_code
         payload = request.to_payload()
-
-        # Se channel non è stato passato, usa company_code come channel (normalizzato)
         if "channel" not in payload:
+            # fallback ragionevole: usa il company_code come channel di sorgente
             if not self.company_code:
                 raise APIError("channel non fornito e company_code non impostato sul client.")
-            payload["channel"] = _sanitize_channel(self.company_code)
-
-        # Se il channel contiene ancora spazi (caso anomalo), fail fast
-        if " " in payload.get("channel", ""):
-            raise APIError(f"Il channel contiene spazi non validi: '{payload['channel']}'")
+            payload["channel"] = self.company_code
 
         resp = self._request("POST", self.QUOTATIONS_PATH, headers=headers, json_body=payload)
-        print(json.dumps(resp.json(), indent=2))
-
         # prova subito a leggere JSON
         try:
             raw = resp.json()
         except Exception:
             raw = {"raw": resp.text}
 
-        # Mappatura errori applicativi nota
+        # Se l'API segnala errore applicativo, mappalo in modo chiaro
         if isinstance(raw, dict):
+            # pattern visto nell'output: status: "error" + data.errors.Error.ShortText
             status = str(raw.get("status", "")).lower()
             err_node = (((raw.get("data") or {}).get("errors") or {}).get("Error") or {})
             short_text = err_node.get("ShortText")
-            code = _coerce_int(err_node.get("Code"))
-
+            code = err_node.get("Code")
             if status == "error" or short_text:
-                # In particolare, gestiamo il Code 366 con un messaggio utile
-                if code == 366:
-                    # Spesso causato da channel non abilitato per Booking o stringa channel non valida
-                    tips = (
-                        "Possibili cause: channel non abilitato ('Abilita per Booking' non spuntato) "
-                        "oppure valore di 'channel' non valido (p.es. spazi non permessi). "
-                        "Verificare in MyRent la convenzione e riprovare."
-                    )
-                    raise APIError(
-                        f"Quotations error (code=366): {short_text}. {tips} | payload={json.dumps(raw)[:500]}"
-                    )
-                # default
                 raise APIError(f"Quotations error (code={code}): {short_text} | payload={json.dumps(raw)[:500]}")
 
         # altrimenti prosegui con il parser "tollerante"
@@ -752,3 +678,4 @@ class MyRentClient:
         if not isinstance(data, dict):
             raise APIError("Formato inatteso della risposta di quotations.")
         return QuotationResponse.from_api_payload(data)
+

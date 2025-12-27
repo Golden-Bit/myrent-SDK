@@ -17,13 +17,38 @@
       "aircon": true,
       "image_url": "https://raw.githubusercontent.com/Golden-Bit/myrent-SDK/refs/heads/main/data/nuova-fiat-500-club-noleggio-lungo-termine.jpg",
       "daily_rate": 32.0,
-      "locations": ["FCO", "MXP", "FLR", "PMO100", "AHO100", "XRJ"],
-      "plates": ["GF962VG"],
+      "locations": [
+        "FCO",
+        "MXP",
+        "FLR",
+        "PMO100",
+        "AHO100",
+        "XRJ"
+      ],
+      "plates": [
+        "GF962VG"
+      ],
       "vehicle_parameters": [
-        { "name": "Lunghezza esterna", "description": "3571 mm", "position": 1 },
-        { "name": "Larghezza esterna", "description": "1627 mm", "position": 2 },
-        { "name": "Altezza esterna", "description": "1488 mm", "position": 3 },
-        { "name": "Bagagliaio", "description": "185 L", "position": 4 }
+        {
+          "name": "Lunghezza esterna",
+          "description": "3571 mm",
+          "position": 1
+        },
+        {
+          "name": "Larghezza esterna",
+          "description": "1627 mm",
+          "position": 2
+        },
+        {
+          "name": "Altezza esterna",
+          "description": "1488 mm",
+          "position": 3
+        },
+        {
+          "name": "Bagagliaio",
+          "description": "185 L",
+          "position": 4
+        }
       ],
       "damages": {
         "GF962VG": [
@@ -37,7 +62,48 @@
             "percentage_y": 18.4
           }
         ]
-      }
+      },
+      "optionals": [
+        {
+          "code": "BBS",
+          "description": "SEGGIOLINO PER BAMBINI 0/9KG",
+          "equip_type": "BBS",
+          "quantity": 1,
+          "is_multipliable": true,
+          "included_in_est_total": false,
+          "included_in_rate": false,
+          "tax_inclusive": false,
+          "optional_image": null,
+          "amount_per_day": 8.0,
+          "is_daily_price": true
+        },
+        {
+          "code": "ADDITIONAL_DRIVER",
+          "description": "GUIDATORE AGGIUNTIVO",
+          "equip_type": "ADDITIONAL",
+          "quantity": 1,
+          "is_multipliable": false,
+          "included_in_est_total": false,
+          "included_in_rate": false,
+          "tax_inclusive": false,
+          "optional_image": null,
+          "amount_per_day": 12.0,
+          "is_daily_price": true
+        },
+        {
+          "code": "PREPAID_FUEL",
+          "description": "PIENO PREPAGATO",
+          "equip_type": "PREPAID_FUEL",
+          "quantity": 1,
+          "is_multipliable": false,
+          "included_in_est_total": false,
+          "included_in_rate": false,
+          "tax_inclusive": false,
+          "optional_image": null,
+          "amount": 90.0,
+          "is_daily_price": false
+        }
+      ]
     },
     {
       "id": "0f8f4f33-3f1a-4d7a-9b1c-2a2a74a8dd2b",
@@ -54,7 +120,54 @@
       "aircon": true,
       "image_url": "https://raw.githubusercontent.com/Golden-Bit/myrent-SDK/refs/heads/main/data/nuova-fiat-500-club-noleggio-lungo-termine.jpg",
       "daily_rate": 38.0,
-      "locations": ["FCO", "MXP", "FLR", "PMO100", "XRJ"]
+      "locations": [
+        "FCO",
+        "MXP",
+        "FLR",
+        "PMO100",
+        "XRJ"
+      ],
+      "optionals": [
+        {
+          "code": "BBS",
+          "description": "SEGGIOLINO PER BAMBINI 0/9KG",
+          "equip_type": "BBS",
+          "quantity": 1,
+          "is_multipliable": true,
+          "included_in_est_total": false,
+          "included_in_rate": false,
+          "tax_inclusive": false,
+          "optional_image": null,
+          "amount_per_day": 8.0,
+          "is_daily_price": true
+        },
+        {
+          "code": "ADDITIONAL_DRIVER",
+          "description": "GUIDATORE AGGIUNTIVO",
+          "equip_type": "ADDITIONAL",
+          "quantity": 1,
+          "is_multipliable": false,
+          "included_in_est_total": false,
+          "included_in_rate": false,
+          "tax_inclusive": false,
+          "optional_image": null,
+          "amount_per_day": 12.0,
+          "is_daily_price": true
+        },
+        {
+          "code": "ROAD_ASS",
+          "description": "ASSISTENZA STRADALE",
+          "equip_type": "ROAD_ASS",
+          "quantity": 1,
+          "is_multipliable": false,
+          "included_in_est_total": false,
+          "included_in_rate": false,
+          "tax_inclusive": false,
+          "optional_image": null,
+          "amount_per_day": 4.0,
+          "is_daily_price": true
+        }
+      ]
     },
     {
       "id": "a6c3f1e7-9b2c-4d8f-8a4e-3e1c2b4f7d9a",
@@ -71,7 +184,54 @@
       "aircon": true,
       "image_url": "https://raw.githubusercontent.com/Golden-Bit/myrent-SDK/refs/heads/main/data/nuova-fiat-500-club-noleggio-lungo-termine.jpg",
       "daily_rate": 46.0,
-      "locations": ["FCO", "MXP", "FLR", "PMO100", "AHO100"]
+      "locations": [
+        "FCO",
+        "MXP",
+        "FLR",
+        "PMO100",
+        "AHO100"
+      ],
+      "optionals": [
+        {
+          "code": "BBS",
+          "description": "SEGGIOLINO PER BAMBINI 0/9KG",
+          "equip_type": "BBS",
+          "quantity": 1,
+          "is_multipliable": true,
+          "included_in_est_total": false,
+          "included_in_rate": false,
+          "tax_inclusive": false,
+          "optional_image": null,
+          "amount_per_day": 9.0,
+          "is_daily_price": true
+        },
+        {
+          "code": "ADDITIONAL_DRIVER",
+          "description": "GUIDATORE AGGIUNTIVO",
+          "equip_type": "ADDITIONAL",
+          "quantity": 1,
+          "is_multipliable": false,
+          "included_in_est_total": false,
+          "included_in_rate": false,
+          "tax_inclusive": false,
+          "optional_image": null,
+          "amount_per_day": 13.0,
+          "is_daily_price": true
+        },
+        {
+          "code": "CRYSTAL",
+          "description": "COPERTURA CRISTALLI",
+          "equip_type": "CRYSTAL",
+          "quantity": 1,
+          "is_multipliable": false,
+          "included_in_est_total": false,
+          "included_in_rate": false,
+          "tax_inclusive": false,
+          "optional_image": null,
+          "amount_per_day": 5.0,
+          "is_daily_price": true
+        }
+      ]
     },
     {
       "id": "c4d2a1b3-8e7f-4a9d-b2c1-7e5f8a3d2c9b",
@@ -88,7 +248,52 @@
       "aircon": true,
       "image_url": "https://raw.githubusercontent.com/Golden-Bit/myrent-SDK/refs/heads/main/data/nuova-fiat-500-club-noleggio-lungo-termine.jpg",
       "daily_rate": 52.0,
-      "locations": ["FCO", "MXP", "FLR"]
+      "locations": [
+        "FCO",
+        "MXP",
+        "FLR"
+      ],
+      "optionals": [
+        {
+          "code": "BBS",
+          "description": "SEGGIOLINO PER BAMBINI 0/9KG",
+          "equip_type": "BBS",
+          "quantity": 1,
+          "is_multipliable": true,
+          "included_in_est_total": false,
+          "included_in_rate": false,
+          "tax_inclusive": false,
+          "optional_image": null,
+          "amount_per_day": 9.0,
+          "is_daily_price": true
+        },
+        {
+          "code": "ADDITIONAL_DRIVER",
+          "description": "GUIDATORE AGGIUNTIVO",
+          "equip_type": "ADDITIONAL",
+          "quantity": 1,
+          "is_multipliable": false,
+          "included_in_est_total": false,
+          "included_in_rate": false,
+          "tax_inclusive": false,
+          "optional_image": null,
+          "amount_per_day": 13.0,
+          "is_daily_price": true
+        },
+        {
+          "code": "GOLD",
+          "description": "GOLD PACKAGE/PACCHETTO ORO",
+          "equip_type": "GOLD",
+          "quantity": 1,
+          "is_multipliable": false,
+          "included_in_est_total": false,
+          "included_in_rate": false,
+          "tax_inclusive": false,
+          "optional_image": null,
+          "amount_per_day": 20.0,
+          "is_daily_price": true
+        }
+      ]
     },
     {
       "id": "f9a8b7c6-5d4e-4c3b-8a9f-1e2d3c4b5a6f",
@@ -105,7 +310,54 @@
       "aircon": true,
       "image_url": "https://raw.githubusercontent.com/Golden-Bit/myrent-SDK/refs/heads/main/data/nuova-fiat-500-club-noleggio-lungo-termine.jpg",
       "daily_rate": 64.0,
-      "locations": ["FCO", "MXP", "FLR", "PMO100", "AHO100"]
+      "locations": [
+        "FCO",
+        "MXP",
+        "FLR",
+        "PMO100",
+        "AHO100"
+      ],
+      "optionals": [
+        {
+          "code": "BBS",
+          "description": "SEGGIOLINO PER BAMBINI 0/9KG",
+          "equip_type": "BBS",
+          "quantity": 1,
+          "is_multipliable": true,
+          "included_in_est_total": false,
+          "included_in_rate": false,
+          "tax_inclusive": false,
+          "optional_image": null,
+          "amount_per_day": 10.0,
+          "is_daily_price": true
+        },
+        {
+          "code": "ADDITIONAL_DRIVER",
+          "description": "GUIDATORE AGGIUNTIVO",
+          "equip_type": "ADDITIONAL",
+          "quantity": 1,
+          "is_multipliable": false,
+          "included_in_est_total": false,
+          "included_in_rate": false,
+          "tax_inclusive": false,
+          "optional_image": null,
+          "amount_per_day": 14.0,
+          "is_daily_price": true
+        },
+        {
+          "code": "CROSS",
+          "description": "CROSS BORDER",
+          "equip_type": "CROSS",
+          "quantity": 1,
+          "is_multipliable": false,
+          "included_in_est_total": false,
+          "included_in_rate": false,
+          "tax_inclusive": false,
+          "optional_image": null,
+          "amount": 15.0,
+          "is_daily_price": false
+        }
+      ]
     },
     {
       "id": "1a2b3c4d-5e6f-4a7b-8c9d-0e1f2a3b4c5d",
@@ -122,7 +374,53 @@
       "aircon": true,
       "image_url": "https://raw.githubusercontent.com/Golden-Bit/myrent-SDK/refs/heads/main/data/nuova-fiat-500-club-noleggio-lungo-termine.jpg",
       "daily_rate": 72.0,
-      "locations": ["FCO", "MXP", "FLR", "PMO100"]
+      "locations": [
+        "FCO",
+        "MXP",
+        "FLR",
+        "PMO100"
+      ],
+      "optionals": [
+        {
+          "code": "BBS",
+          "description": "SEGGIOLINO PER BAMBINI 0/9KG",
+          "equip_type": "BBS",
+          "quantity": 1,
+          "is_multipliable": true,
+          "included_in_est_total": false,
+          "included_in_rate": false,
+          "tax_inclusive": false,
+          "optional_image": null,
+          "amount_per_day": 10.0,
+          "is_daily_price": true
+        },
+        {
+          "code": "ADDITIONAL_DRIVER",
+          "description": "GUIDATORE AGGIUNTIVO",
+          "equip_type": "ADDITIONAL",
+          "quantity": 1,
+          "is_multipliable": false,
+          "included_in_est_total": false,
+          "included_in_rate": false,
+          "tax_inclusive": false,
+          "optional_image": null,
+          "amount_per_day": 14.0,
+          "is_daily_price": true
+        },
+        {
+          "code": "PREPAID_FUEL",
+          "description": "PIENO PREPAGATO",
+          "equip_type": "PREPAID_FUEL",
+          "quantity": 1,
+          "is_multipliable": false,
+          "included_in_est_total": false,
+          "included_in_rate": false,
+          "tax_inclusive": false,
+          "optional_image": null,
+          "amount": 120.0,
+          "is_daily_price": false
+        }
+      ]
     },
     {
       "id": "7e6d5c4b-3a2f-4b1e-9c8d-7a6b5c4d3e2f",
@@ -139,8 +437,14 @@
       "aircon": true,
       "image_url": "https://raw.githubusercontent.com/Golden-Bit/myrent-SDK/refs/heads/main/data/nuova-fiat-500-club-noleggio-lungo-termine.jpg",
       "daily_rate": 88.0,
-      "locations": ["FCO", "MXP", "FLR"],
-      "plates": ["FT233AP"],
+      "locations": [
+        "FCO",
+        "MXP",
+        "FLR"
+      ],
+      "plates": [
+        "FT233AP"
+      ],
       "damages": {
         "FT233AP": [
           {
@@ -150,10 +454,38 @@
             "x": 340,
             "y": 36,
             "percentage_x": 48.71,
-            "percentage_y": 10.20
+            "percentage_y": 10.2
           }
         ]
-      }
+      },
+      "optionals": [
+        {
+          "code": "ADDITIONAL_DRIVER",
+          "description": "GUIDATORE AGGIUNTIVO",
+          "equip_type": "ADDITIONAL",
+          "quantity": 1,
+          "is_multipliable": false,
+          "included_in_est_total": false,
+          "included_in_rate": false,
+          "tax_inclusive": false,
+          "optional_image": null,
+          "amount_per_day": 15.0,
+          "is_daily_price": true
+        },
+        {
+          "code": "DIAMOND",
+          "description": "DIAMOND PACKAGE/PACCHETTO DIAMANTE",
+          "equip_type": "DIAMOND",
+          "quantity": 1,
+          "is_multipliable": false,
+          "included_in_est_total": false,
+          "included_in_rate": false,
+          "tax_inclusive": false,
+          "optional_image": null,
+          "amount_per_day": 30.0,
+          "is_daily_price": true
+        }
+      ]
     },
     {
       "id": "9b8a7c6d-5e4f-4a3b-9c2d-1e0f2a3b4c5d",
@@ -170,7 +502,51 @@
       "aircon": true,
       "image_url": "https://raw.githubusercontent.com/Golden-Bit/myrent-SDK/refs/heads/main/data/nuova-fiat-500-club-noleggio-lungo-termine.jpg",
       "daily_rate": 140.0,
-      "locations": ["FCO", "MXP"]
+      "locations": [
+        "FCO",
+        "MXP"
+      ],
+      "optionals": [
+        {
+          "code": "ADDITIONAL_DRIVER",
+          "description": "GUIDATORE AGGIUNTIVO",
+          "equip_type": "ADDITIONAL",
+          "quantity": 1,
+          "is_multipliable": false,
+          "included_in_est_total": false,
+          "included_in_rate": false,
+          "tax_inclusive": false,
+          "optional_image": null,
+          "amount_per_day": 20.0,
+          "is_daily_price": true
+        },
+        {
+          "code": "DIAMOND",
+          "description": "DIAMOND PACKAGE/PACCHETTO DIAMANTE",
+          "equip_type": "DIAMOND",
+          "quantity": 1,
+          "is_multipliable": false,
+          "included_in_est_total": false,
+          "included_in_rate": false,
+          "tax_inclusive": false,
+          "optional_image": null,
+          "amount_per_day": 40.0,
+          "is_daily_price": true
+        },
+        {
+          "code": "CROSS",
+          "description": "CROSS BORDER",
+          "equip_type": "CROSS",
+          "quantity": 1,
+          "is_multipliable": false,
+          "included_in_est_total": false,
+          "included_in_rate": false,
+          "tax_inclusive": false,
+          "optional_image": null,
+          "amount": 20.0,
+          "is_daily_price": false
+        }
+      ]
     },
     {
       "id": "2f3e4d5c-6b7a-4c8d-9e0f-1a2b3c4d5e6f",
@@ -187,8 +563,55 @@
       "aircon": true,
       "image_url": "https://raw.githubusercontent.com/Golden-Bit/myrent-SDK/refs/heads/main/data/nuova-fiat-500-club-noleggio-lungo-termine.jpg",
       "daily_rate": 78.0,
-      "locations": ["FCO", "MXP", "FLR"],
-      "plates": ["GE765TR"]
+      "locations": [
+        "FCO",
+        "MXP",
+        "FLR"
+      ],
+      "plates": [
+        "GE765TR"
+      ],
+      "optionals": [
+        {
+          "code": "BBS",
+          "description": "SEGGIOLINO PER BAMBINI 0/9KG",
+          "equip_type": "BBS",
+          "quantity": 1,
+          "is_multipliable": true,
+          "included_in_est_total": false,
+          "included_in_rate": false,
+          "tax_inclusive": false,
+          "optional_image": null,
+          "amount_per_day": 10.0,
+          "is_daily_price": true
+        },
+        {
+          "code": "GOLD",
+          "description": "GOLD PACKAGE/PACCHETTO ORO",
+          "equip_type": "GOLD",
+          "quantity": 1,
+          "is_multipliable": false,
+          "included_in_est_total": false,
+          "included_in_rate": false,
+          "tax_inclusive": false,
+          "optional_image": null,
+          "amount_per_day": 25.0,
+          "is_daily_price": true
+        },
+        {
+          "code": "ROAD_ASS",
+          "description": "ASSISTENZA STRADALE",
+          "equip_type": "ROAD_ASS",
+          "quantity": 1,
+          "is_multipliable": false,
+          "included_in_est_total": false,
+          "included_in_rate": false,
+          "tax_inclusive": false,
+          "optional_image": null,
+          "amount_per_day": 6.0,
+          "is_daily_price": true
+        }
+      ]
     },
     {
       "id": "4c3b2a1f-0e9d-4c8b-7a6f-5d4e3c2b1a0f",
@@ -205,8 +628,67 @@
       "aircon": true,
       "image_url": "https://raw.githubusercontent.com/Golden-Bit/myrent-SDK/refs/heads/main/data/nuova-fiat-500-club-noleggio-lungo-termine.jpg",
       "daily_rate": 110.0,
-      "locations": ["FCO", "MXP"],
-      "plates": ["FM432KL"]
+      "locations": [
+        "FCO",
+        "MXP"
+      ],
+      "plates": [
+        "FM432KL"
+      ],
+      "optionals": [
+        {
+          "code": "BBS",
+          "description": "SEGGIOLINO PER BAMBINI 0/9KG",
+          "equip_type": "BBS",
+          "quantity": 1,
+          "is_multipliable": true,
+          "included_in_est_total": false,
+          "included_in_rate": false,
+          "tax_inclusive": false,
+          "optional_image": null,
+          "amount_per_day": 10.0,
+          "is_daily_price": true
+        },
+        {
+          "code": "SILVER",
+          "description": "SILVER PACKAGE/PACCHETTO ARGENTO",
+          "equip_type": "SILVER",
+          "quantity": 1,
+          "is_multipliable": false,
+          "included_in_est_total": false,
+          "included_in_rate": false,
+          "tax_inclusive": false,
+          "optional_image": null,
+          "amount_per_day": 20.0,
+          "is_daily_price": true
+        },
+        {
+          "code": "GOLD",
+          "description": "GOLD PACKAGE/PACCHETTO ORO",
+          "equip_type": "GOLD",
+          "quantity": 1,
+          "is_multipliable": false,
+          "included_in_est_total": false,
+          "included_in_rate": false,
+          "tax_inclusive": false,
+          "optional_image": null,
+          "amount_per_day": 25.0,
+          "is_daily_price": true
+        },
+        {
+          "code": "DIAMOND",
+          "description": "DIAMOND PACKAGE/PACCHETTO DIAMANTE",
+          "equip_type": "DIAMOND",
+          "quantity": 1,
+          "is_multipliable": false,
+          "included_in_est_total": false,
+          "included_in_rate": false,
+          "tax_inclusive": false,
+          "optional_image": null,
+          "amount_per_day": 35.0,
+          "is_daily_price": true
+        }
+      ]
     },
     {
       "id": "e1f2a3b4-c5d6-4e7f-8a9b-0c1d2e3f4a5b",
@@ -223,7 +705,40 @@
       "aircon": true,
       "image_url": "https://raw.githubusercontent.com/Golden-Bit/myrent-SDK/refs/heads/main/data/nuova-fiat-500-club-noleggio-lungo-termine.jpg",
       "daily_rate": 58.0,
-      "locations": ["FCO", "MXP", "FLR", "PMO100"]
+      "locations": [
+        "FCO",
+        "MXP",
+        "FLR",
+        "PMO100"
+      ],
+      "optionals": [
+        {
+          "code": "BBS",
+          "description": "SEGGIOLINO PER BAMBINI 0/9KG",
+          "equip_type": "BBS",
+          "quantity": 1,
+          "is_multipliable": true,
+          "included_in_est_total": false,
+          "included_in_rate": false,
+          "tax_inclusive": false,
+          "optional_image": null,
+          "amount_per_day": 9.0,
+          "is_daily_price": true
+        },
+        {
+          "code": "ROAD_ASS",
+          "description": "ASSISTENZA STRADALE",
+          "equip_type": "ROAD_ASS",
+          "quantity": 1,
+          "is_multipliable": false,
+          "included_in_est_total": false,
+          "included_in_rate": false,
+          "tax_inclusive": false,
+          "optional_image": null,
+          "amount_per_day": 5.0,
+          "is_daily_price": true
+        }
+      ]
     },
     {
       "id": "5a4b3c2d-1e0f-4a9b-8c7d-6e5f4d3c2b1a",
@@ -240,7 +755,54 @@
       "aircon": true,
       "image_url": "https://raw.githubusercontent.com/Golden-Bit/myrent-SDK/refs/heads/main/data/nuova-fiat-500-club-noleggio-lungo-termine.jpg",
       "daily_rate": 52.0,
-      "locations": ["FCO", "MXP", "FLR", "PMO100", "AHO100"]
+      "locations": [
+        "FCO",
+        "MXP",
+        "FLR",
+        "PMO100",
+        "AHO100"
+      ],
+      "optionals": [
+        {
+          "code": "BBS",
+          "description": "SEGGIOLINO PER BAMBINI 0/9KG",
+          "equip_type": "BBS",
+          "quantity": 1,
+          "is_multipliable": true,
+          "included_in_est_total": false,
+          "included_in_rate": false,
+          "tax_inclusive": false,
+          "optional_image": null,
+          "amount_per_day": 9.0,
+          "is_daily_price": true
+        },
+        {
+          "code": "ROAD_ASS",
+          "description": "ASSISTENZA STRADALE",
+          "equip_type": "ROAD_ASS",
+          "quantity": 1,
+          "is_multipliable": false,
+          "included_in_est_total": false,
+          "included_in_rate": false,
+          "tax_inclusive": false,
+          "optional_image": null,
+          "amount_per_day": 5.0,
+          "is_daily_price": true
+        },
+        {
+          "code": "PREPAID_FUEL",
+          "description": "PIENO PREPAGATO",
+          "equip_type": "PREPAID_FUEL",
+          "quantity": 1,
+          "is_multipliable": false,
+          "included_in_est_total": false,
+          "included_in_rate": false,
+          "tax_inclusive": false,
+          "optional_image": null,
+          "amount": 100.0,
+          "is_daily_price": false
+        }
+      ]
     },
     {
       "id": "8f7e6d5c-4b3a-4c2d-9e1f-0a9b8c7d6e5f",
@@ -257,7 +819,52 @@
       "aircon": true,
       "image_url": "https://raw.githubusercontent.com/Golden-Bit/myrent-SDK/refs/heads/main/data/nuova-fiat-500-club-noleggio-lungo-termine.jpg",
       "daily_rate": 84.0,
-      "locations": ["FCO", "MXP", "FLR"]
+      "locations": [
+        "FCO",
+        "MXP",
+        "FLR"
+      ],
+      "optionals": [
+        {
+          "code": "BBS",
+          "description": "SEGGIOLINO PER BAMBINI 0/9KG",
+          "equip_type": "BBS",
+          "quantity": 1,
+          "is_multipliable": true,
+          "included_in_est_total": false,
+          "included_in_rate": false,
+          "tax_inclusive": false,
+          "optional_image": null,
+          "amount_per_day": 12.0,
+          "is_daily_price": true
+        },
+        {
+          "code": "ADDITIONAL_DRIVER",
+          "description": "GUIDATORE AGGIUNTIVO",
+          "equip_type": "ADDITIONAL",
+          "quantity": 1,
+          "is_multipliable": false,
+          "included_in_est_total": false,
+          "included_in_rate": false,
+          "tax_inclusive": false,
+          "optional_image": null,
+          "amount_per_day": 15.0,
+          "is_daily_price": true
+        },
+        {
+          "code": "CROSS",
+          "description": "CROSS BORDER",
+          "equip_type": "CROSS",
+          "quantity": 1,
+          "is_multipliable": false,
+          "included_in_est_total": false,
+          "included_in_rate": false,
+          "tax_inclusive": false,
+          "optional_image": null,
+          "amount": 20.0,
+          "is_daily_price": false
+        }
+      ]
     },
     {
       "id": "0a1b2c3d-4e5f-4a6b-8c9d-1e2f3a4b5c6d",
@@ -274,8 +881,56 @@
       "aircon": true,
       "image_url": "https://raw.githubusercontent.com/Golden-Bit/myrent-SDK/refs/heads/main/data/nuova-fiat-500-club-noleggio-lungo-termine.jpg",
       "daily_rate": 95.0,
-      "locations": ["FCO", "MXP", "FLR", "PMO100"],
-      "plates": ["AA123BB"]
+      "locations": [
+        "FCO",
+        "MXP",
+        "FLR",
+        "PMO100"
+      ],
+      "plates": [
+        "AA123BB"
+      ],
+      "optionals": [
+        {
+          "code": "BBS",
+          "description": "SEGGIOLINO PER BAMBINI 0/9KG",
+          "equip_type": "BBS",
+          "quantity": 1,
+          "is_multipliable": true,
+          "included_in_est_total": false,
+          "included_in_rate": false,
+          "tax_inclusive": false,
+          "optional_image": null,
+          "amount_per_day": 15.0,
+          "is_daily_price": true
+        },
+        {
+          "code": "ADDITIONAL_DRIVER",
+          "description": "GUIDATORE AGGIUNTIVO",
+          "equip_type": "ADDITIONAL",
+          "quantity": 1,
+          "is_multipliable": false,
+          "included_in_est_total": false,
+          "included_in_rate": false,
+          "tax_inclusive": false,
+          "optional_image": null,
+          "amount_per_day": 18.0,
+          "is_daily_price": true
+        },
+        {
+          "code": "CROSS",
+          "description": "CROSS BORDER",
+          "equip_type": "CROSS",
+          "quantity": 1,
+          "is_multipliable": false,
+          "included_in_est_total": false,
+          "included_in_rate": false,
+          "tax_inclusive": false,
+          "optional_image": null,
+          "amount": 30.0,
+          "is_daily_price": false
+        }
+      ]
     },
     {
       "id": "6d5c4b3a-2f1e-4d8c-9b0a-1c2d3e4f5a6b",
@@ -292,8 +947,56 @@
       "aircon": true,
       "image_url": "https://raw.githubusercontent.com/Golden-Bit/myrent-SDK/refs/heads/main/data/nuova-fiat-500-club-noleggio-lungo-termine.jpg",
       "daily_rate": 56.0,
-      "locations": ["FCO", "MXP", "FLR", "XRJ"],
-      "plates": ["EV001IT"]
+      "locations": [
+        "FCO",
+        "MXP",
+        "FLR",
+        "XRJ"
+      ],
+      "plates": [
+        "EV001IT"
+      ],
+      "optionals": [
+        {
+          "code": "BBS",
+          "description": "SEGGIOLINO PER BAMBINI 0/9KG",
+          "equip_type": "BBS",
+          "quantity": 1,
+          "is_multipliable": true,
+          "included_in_est_total": false,
+          "included_in_rate": false,
+          "tax_inclusive": false,
+          "optional_image": null,
+          "amount_per_day": 9.0,
+          "is_daily_price": true
+        },
+        {
+          "code": "ADDITIONAL_DRIVER",
+          "description": "GUIDATORE AGGIUNTIVO",
+          "equip_type": "ADDITIONAL",
+          "quantity": 1,
+          "is_multipliable": false,
+          "included_in_est_total": false,
+          "included_in_rate": false,
+          "tax_inclusive": false,
+          "optional_image": null,
+          "amount_per_day": 12.0,
+          "is_daily_price": true
+        },
+        {
+          "code": "EV_CHARGE",
+          "description": "RICARICA EV",
+          "equip_type": "EV_CHARGE",
+          "quantity": 1,
+          "is_multipliable": false,
+          "included_in_est_total": false,
+          "included_in_rate": false,
+          "tax_inclusive": false,
+          "optional_image": null,
+          "amount": 25.0,
+          "is_daily_price": false
+        }
+      ]
     },
     {
       "id": "3e2d1c0b-9a8f-4d7c-6b5a-4c3d2e1f0a9b",
@@ -310,7 +1013,53 @@
       "aircon": true,
       "image_url": "https://raw.githubusercontent.com/Golden-Bit/myrent-SDK/refs/heads/main/data/nuova-fiat-500-club-noleggio-lungo-termine.jpg",
       "daily_rate": 54.0,
-      "locations": ["FCO", "MXP", "PMO100", "AHO100"]
+      "locations": [
+        "FCO",
+        "MXP",
+        "PMO100",
+        "AHO100"
+      ],
+      "optionals": [
+        {
+          "code": "BBS",
+          "description": "SEGGIOLINO PER BAMBINI 0/9KG",
+          "equip_type": "BBS",
+          "quantity": 1,
+          "is_multipliable": true,
+          "included_in_est_total": false,
+          "included_in_rate": false,
+          "tax_inclusive": false,
+          "optional_image": null,
+          "amount_per_day": 10.0,
+          "is_daily_price": true
+        },
+        {
+          "code": "ADDITIONAL_DRIVER",
+          "description": "GUIDATORE AGGIUNTIVO",
+          "equip_type": "ADDITIONAL",
+          "quantity": 1,
+          "is_multipliable": false,
+          "included_in_est_total": false,
+          "included_in_rate": false,
+          "tax_inclusive": false,
+          "optional_image": null,
+          "amount_per_day": 15.0,
+          "is_daily_price": true
+        },
+        {
+          "code": "EXTRA_INSURANCE",
+          "description": "COPERTURA EXTRA",
+          "equip_type": "EXTRA_INSURANCE",
+          "quantity": 1,
+          "is_multipliable": false,
+          "included_in_est_total": false,
+          "included_in_rate": false,
+          "tax_inclusive": false,
+          "optional_image": null,
+          "amount_per_day": 18.0,
+          "is_daily_price": true
+        }
+      ]
     },
     {
       "id": "ad2b91f8-3c4d-4e5f-8a7b-9c0d1e2f3a4b",
@@ -327,7 +1076,52 @@
       "aircon": true,
       "image_url": "https://raw.githubusercontent.com/Golden-Bit/myrent-SDK/refs/heads/main/data/nuova-fiat-500-club-noleggio-lungo-termine.jpg",
       "daily_rate": 82.0,
-      "locations": ["FCO", "MXP", "PMO100"]
+      "locations": [
+        "FCO",
+        "MXP",
+        "PMO100"
+      ],
+      "optionals": [
+        {
+          "code": "BBS",
+          "description": "SEGGIOLINO PER BAMBINI 0/9KG",
+          "equip_type": "BBS",
+          "quantity": 1,
+          "is_multipliable": true,
+          "included_in_est_total": false,
+          "included_in_rate": false,
+          "tax_inclusive": false,
+          "optional_image": null,
+          "amount_per_day": 12.0,
+          "is_daily_price": true
+        },
+        {
+          "code": "ADDITIONAL_DRIVER",
+          "description": "GUIDATORE AGGIUNTIVO",
+          "equip_type": "ADDITIONAL",
+          "quantity": 1,
+          "is_multipliable": false,
+          "included_in_est_total": false,
+          "included_in_rate": false,
+          "tax_inclusive": false,
+          "optional_image": null,
+          "amount_per_day": 16.0,
+          "is_daily_price": true
+        },
+        {
+          "code": "EXTRA_INSURANCE",
+          "description": "COPERTURA EXTRA",
+          "equip_type": "EXTRA_INSURANCE",
+          "quantity": 1,
+          "is_multipliable": false,
+          "included_in_est_total": false,
+          "included_in_rate": false,
+          "tax_inclusive": false,
+          "optional_image": null,
+          "amount_per_day": 20.0,
+          "is_daily_price": true
+        }
+      ]
     }
   ]
 }

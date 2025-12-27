@@ -2,8 +2,6 @@ from __future__ import annotations
 from fastapi import FastAPI, HTTPException, Header, Depends, Query
 from pydantic import BaseModel, Field, field_validator, ConfigDict
 from typing import List, Optional, Union, Dict, Any
-from enum import Enum
-from threading import Lock
 from datetime import datetime
 import json, os, math, hashlib, base64
 from fastapi.middleware.cors import CORSMiddleware
@@ -47,42 +45,6 @@ def require_api_key(x_api_key: Optional[str] = Header(None), tokenValue: Optiona
     if key != API_KEY:
         raise HTTPException(status_code=401, detail="Invalid or missing API key")
     return True
-
-# ---- Data source selection (DEFAULT mock vs MYRENT live via SDK) --------------
-class DataSource(str, Enum):
-    DEFAULT = "DEFAULT"
-    MYRENT = "MYRENT"
-
-_MYRENT_ADAPTER = None
-_MYRENT_LOCK = Lock()
-
-def get_myrent_adapter():
-    """
-    Lazy loader dell'adapter MyRent.
-
-    - Importa `MyRentAdapter` solo quando serve (source=MYRENT), così la wrapper
-      continua a funzionare anche senza dipendenze MyRent in modalità DEFAULT.
-    - Legge configurazione da env vars (vedi MyRentAdapter.from_env()).
-    """
-    global _MYRENT_ADAPTER
-    if _MYRENT_ADAPTER is None:
-        with _MYRENT_LOCK:
-            if _MYRENT_ADAPTER is None:
-                try:
-                    from app.myrent_adapter import MyRentAdapter, MyRentAdapterError
-                except Exception as e:  # pragma: no cover
-                    raise HTTPException(
-                        status_code=500,
-                        detail=f"MyRent adapter import failed: {e}",
-                    )
-                try:
-                    _MYRENT_ADAPTER = MyRentAdapter.from_env()
-                except Exception as e:  # pragma: no cover
-                    raise HTTPException(
-                        status_code=500,
-                        detail=f"MyRent adapter not configured: {e}",
-                    )
-    return _MYRENT_ADAPTER
 
 # ---- Schemi Pydantic ---------------------------------------------------------
 
@@ -1036,39 +998,12 @@ def health():
 
 # NB: qui puoi incollare la lista LOCATIONS identica al tuo file (omessa per brevità)
 @app.get("/api/v1/touroperator/locations", response_model=List[Location], tags=["locations"])
-def list_locations(
-    source: DataSource = Query(
-        default=DataSource.DEFAULT,
-        description="Fonte dati: DEFAULT (mock) oppure MYRENT (live via SDK)",
-        examples=["DEFAULT"],
-    ),
-    auth: bool = Depends(require_api_key),
-):
+def list_locations(auth: bool = Depends(require_api_key)):
     # restituisci eventuale lista LOCATIONS definita come nel tuo file originale
-    if source == DataSource.DEFAULT:
-        return LOCATIONS  # <-- mock locale
-    adapter = get_myrent_adapter()
-    return adapter.get_locations()
+    return LOCATIONS  # <-- Sostituisci con la tua lista LOCATIONS reale
 
 @app.post("/api/v1/touroperator/quotations", response_model=QuotationResponse, tags=["quotations"])
-def quotations(
-    req: QuotationRequest,
-    source: DataSource = Query(
-        default=DataSource.DEFAULT,
-        description="Fonte dati: DEFAULT (mock) oppure MYRENT (live via SDK)",
-        examples=["DEFAULT"],
-    ),
-    auth: bool = Depends(require_api_key),
-):
-    if source == DataSource.MYRENT:
-        adapter = get_myrent_adapter()
-        try:
-            converted = adapter.get_quotations(req.model_dump())
-        except Exception as e:
-            raise HTTPException(status_code=502, detail=f"MyRent quotations error: {e}")
-        # Manteniamo INVARIATO lo schema di output dell'endpoint (QuotationResponse)
-        return QuotationResponse.model_validate(converted)
-
+def quotations(req: QuotationRequest, auth: bool = Depends(require_api_key)):
     start = parse_dt(req.startDate)
     end = parse_dt(req.endDate)
     if end <= start:

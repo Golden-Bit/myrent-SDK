@@ -2,8 +2,6 @@ from __future__ import annotations
 from fastapi import FastAPI, HTTPException, Header, Depends, Query
 from pydantic import BaseModel, Field, field_validator, ConfigDict
 from typing import List, Optional, Union, Dict, Any
-from enum import Enum
-from threading import Lock
 from datetime import datetime
 import json, os, math, hashlib, base64
 from fastapi.middleware.cors import CORSMiddleware
@@ -47,42 +45,6 @@ def require_api_key(x_api_key: Optional[str] = Header(None), tokenValue: Optiona
     if key != API_KEY:
         raise HTTPException(status_code=401, detail="Invalid or missing API key")
     return True
-
-# ---- Data source selection (DEFAULT mock vs MYRENT live via SDK) --------------
-class DataSource(str, Enum):
-    DEFAULT = "DEFAULT"
-    MYRENT = "MYRENT"
-
-_MYRENT_ADAPTER = None
-_MYRENT_LOCK = Lock()
-
-def get_myrent_adapter():
-    """
-    Lazy loader dell'adapter MyRent.
-
-    - Importa `MyRentAdapter` solo quando serve (source=MYRENT), così la wrapper
-      continua a funzionare anche senza dipendenze MyRent in modalità DEFAULT.
-    - Legge configurazione da env vars (vedi MyRentAdapter.from_env()).
-    """
-    global _MYRENT_ADAPTER
-    if _MYRENT_ADAPTER is None:
-        with _MYRENT_LOCK:
-            if _MYRENT_ADAPTER is None:
-                try:
-                    from app.myrent_adapter import MyRentAdapter, MyRentAdapterError
-                except Exception as e:  # pragma: no cover
-                    raise HTTPException(
-                        status_code=500,
-                        detail=f"MyRent adapter import failed: {e}",
-                    )
-                try:
-                    _MYRENT_ADAPTER = MyRentAdapter.from_env()
-                except Exception as e:  # pragma: no cover
-                    raise HTTPException(
-                        status_code=500,
-                        detail=f"MyRent adapter not configured: {e}",
-                    )
-    return _MYRENT_ADAPTER
 
 # ---- Schemi Pydantic ---------------------------------------------------------
 
@@ -344,10 +306,6 @@ class VehicleStatus(BaseModel):
     """
     Stato di offerta/availability per un determinato gruppo/veicolo in output alle quotazioni.
 
-    NOTA (ALLINEAMENTO MYRENT):
-    - In MyRent, `optionals` e `TotalCharge` sono per-vehicle (dentro ciascun elemento di `Vehicles`).
-    - In questa mock API vengono ora restituiti allo stesso modo (non più a livello root di `data`).
-
     Esempio oggetto (ridotto):
     {
       "Status": "Available",
@@ -357,9 +315,7 @@ class VehicleStatus(BaseModel):
       "Vehicle": { ...BookingVehicle... },
       "vehicleParameter": [ ...VehicleParameter... ],
       "vehicleExtraImage": [],
-      "groupPic": { "id": 321, "url": "https://example.org/pic.jpg" },
-      "optionals": [ ...OptionalItem... ],
-      "TotalCharge": { "EstimatedTotalAmount": 168.36, "RateTotalAmount": 138.0 }
+      "groupPic": { "id": 321, "url": "https://example.org/pic.jpg" }
     }
     """
     Status: str = Field(
@@ -395,19 +351,6 @@ class VehicleStatus(BaseModel):
         None,
         description="Immagine di gruppo (se showPics=true). Default: None."
     )
-
-    # ✅ CHANGE: per-vehicle optionals e TotalCharge (come MyRent)
-    optionals: Optional[List[OptionalItem]] = Field(
-        default_factory=list,
-        description="Lista optional disponibili per QUESTO veicolo/gruppo. Default: []."
-    )
-    total_charge: TotalCharge = Field(
-        ...,
-        alias="TotalCharge",
-        description="Riepilogo economico per QUESTO veicolo/gruppo. Default: OBBLIGATORIO."
-    )
-
-    model_config = ConfigDict(populate_by_name=True)
 
 
 class Charge(BaseModel):
@@ -501,14 +444,9 @@ class OptionalItem(BaseModel):
     # per accettare input sia per alias sia per nome e per esportare con alias
     model_config = ConfigDict(populate_by_name=True)
 
-
 class TotalCharge(BaseModel):
     """
-    Riepilogo economico sintetico restituito da MyRent a livello di singolo veicolo (Vehicles[*].TotalCharge).
-
-    In questa mock:
-    - EstimatedTotalAmount = totale IVA inclusa (base rental, sconti inclusi)
-    - RateTotalAmount = totale pre-IVA (base rental, sconti inclusi)
+    Riepilogo economico sintetico della miglior offerta corrente restituita da /quotations.
 
     Esempio oggetto:
     {
@@ -519,14 +457,14 @@ class TotalCharge(BaseModel):
     EstimatedTotalAmount: float = Field(
         ...,
         description=(
-            "Totale stimato IVA inclusa (per veicolo). "
+            "Totale stimato IVA inclusa (miglior prezzo sul risultato). "
             "Esempio: 168.36. Default: OBBLIGATORIO."
         ),
     )
     RateTotalAmount: float = Field(
         ...,
         description=(
-            "Totale pre-IVA corrispondente (per veicolo). "
+            "Totale pre-IVA corrispondente al miglior prezzo. "
             "Esempio: 138.0. Default: OBBLIGATORIO."
         ),
     )
@@ -536,10 +474,6 @@ class QuotationData(BaseModel):
     """
     Payload 'data' della risposta di /api/v1/touroperator/quotations.
 
-    ✅ CHANGE (ALLINEAMENTO MYRENT):
-    - Rimossi `optionals` e `TotalCharge` a livello root.
-    - Ora `optionals` e `TotalCharge` sono presenti dentro ogni elemento di `Vehicles` (VehicleStatus).
-
     Esempio oggetto (ridotto):
     {
       "total": 5,
@@ -547,7 +481,9 @@ class QuotationData(BaseModel):
       "ReturnLocation": "MXP",
       "PickUpDateTime": "2025-10-12T10:00:00Z",
       "ReturnDateTime": "2025-10-15T12:00:00Z",
-      "Vehicles": [ ...VehicleStatus (con optionals e TotalCharge)... ]
+      "Vehicles": [ ...VehicleStatus... ],
+      "optionals": [ ...OptionalItem... ],
+      "TotalCharge": { "EstimatedTotalAmount": 168.36, "RateTotalAmount": 138.0 }
     }
     """
     total: int = Field(
@@ -573,6 +509,18 @@ class QuotationData(BaseModel):
     Vehicles: List[VehicleStatus] = Field(
         ...,
         description="Lista degli elementi VehicleStatus risultanti dal calcolo. Esempio: [...]. Default: OBBLIGATORIO."
+    )
+    optionals: Optional[List[OptionalItem]] = Field(
+        default_factory=list,
+        description="Lista optional disponibili per il periodo; può essere vuota. Default: []."
+    )
+    total_charge: TotalCharge = Field(
+        ...,
+        alias="TotalCharge",
+        description=(
+            "Riepilogo economico (miglior prezzo). "
+            "Alias JSON: 'TotalCharge'. Default: OBBLIGATORIO."
+        ),
     )
 
     model_config = ConfigDict(populate_by_name=True)
@@ -851,7 +799,6 @@ LOCATIONS: List[Location] = [
         country="ITALIA", zipCode="07041"
     ),
 ]
-
 # ---- Pricing utilities -------------------------------------------------------
 def season_multiplier(dt: datetime) -> float:
     if dt.month in (7, 8): return 1.25
@@ -959,63 +906,13 @@ def build_vehicle_status(item: dict, days: int, start: datetime, end: datetime,
 
     gpic = GroupPic(id=hash(item["international_code"]) % 1000, url=item.get("image_url")) if req.showPics else None
 
-    # ✅ CHANGE: optionals per-vehicle (configurati nel vehicles.json) + TotalCharge per-vehicle
-    optionals_out: List[OptionalItem] = []
-    for opt_def in (item.get("optionals") or []):
-        if not isinstance(opt_def, dict):
-            continue
-
-        # prezzo optional: per-day o fixed
-        amount = 0.0
-        try:
-            if opt_def.get("amount_per_day") is not None:
-                amount = float(opt_def.get("amount_per_day", 0.0)) * days
-            else:
-                raw_amount = float(opt_def.get("amount", 0.0))
-                if bool(opt_def.get("is_daily_price", False)):
-                    amount = raw_amount * days
-                else:
-                    amount = raw_amount
-        except Exception:
-            amount = 0.0
-
-        charge_desc = opt_def.get("description") or opt_def.get("code") or "OPTIONAL"
-        equip_desc = opt_def.get("description") or opt_def.get("code") or "Optional"
-        equip_type = opt_def.get("equip_type") or opt_def.get("code") or "GEN"
-
-        optionals_out.append(
-            OptionalItem(
-                Charge=Charge(
-                    Amount=round(amount, 2),
-                    Description=charge_desc,
-                    IncludedInEstTotalInd=bool(opt_def.get("included_in_est_total", False)),
-                    IncludedInRate=bool(opt_def.get("included_in_rate", False)),
-                    TaxInclusive=bool(opt_def.get("tax_inclusive", False)),
-                ),
-                Equipment=Equipment(
-                    Description=equip_desc,
-                    EquipType=equip_type,
-                    Quantity=int(opt_def.get("quantity", 1) or 1),
-                    isMultipliable=bool(opt_def.get("is_multipliable", True)),
-                    optionalImage=(opt_def.get("optional_image") if req.showOptionalImage else None),
-                ),
-            )
-        )
-
-    vehicle_total_charge = TotalCharge(
-        EstimatedTotalAmount=round(total, 2),
-        RateTotalAmount=round(pre_vat, 2),
-    )
-
     vehicle_status = VehicleStatus(
         Status=status,
         Reference={"ID": 0, "ID_Context": 0, "Type": 0},  # placeholder
         Vehicle=veh,
         vehicleParameter=vparams,
         vehicleExtraImage=[] if req.showVehicleExtraImage else None,
-        groupPic=gpic,
-        optionals=optionals_out,
-        total_charge=vehicle_total_charge,
+        groupPic=gpic
     )
 
     vehicle_status.Reference = {
@@ -1036,39 +933,12 @@ def health():
 
 # NB: qui puoi incollare la lista LOCATIONS identica al tuo file (omessa per brevità)
 @app.get("/api/v1/touroperator/locations", response_model=List[Location], tags=["locations"])
-def list_locations(
-    source: DataSource = Query(
-        default=DataSource.DEFAULT,
-        description="Fonte dati: DEFAULT (mock) oppure MYRENT (live via SDK)",
-        examples=["DEFAULT"],
-    ),
-    auth: bool = Depends(require_api_key),
-):
+def list_locations(auth: bool = Depends(require_api_key)):
     # restituisci eventuale lista LOCATIONS definita come nel tuo file originale
-    if source == DataSource.DEFAULT:
-        return LOCATIONS  # <-- mock locale
-    adapter = get_myrent_adapter()
-    return adapter.get_locations()
+    return LOCATIONS  # <-- Sostituisci con la tua lista LOCATIONS reale
 
 @app.post("/api/v1/touroperator/quotations", response_model=QuotationResponse, tags=["quotations"])
-def quotations(
-    req: QuotationRequest,
-    source: DataSource = Query(
-        default=DataSource.DEFAULT,
-        description="Fonte dati: DEFAULT (mock) oppure MYRENT (live via SDK)",
-        examples=["DEFAULT"],
-    ),
-    auth: bool = Depends(require_api_key),
-):
-    if source == DataSource.MYRENT:
-        adapter = get_myrent_adapter()
-        try:
-            converted = adapter.get_quotations(req.model_dump())
-        except Exception as e:
-            raise HTTPException(status_code=502, detail=f"MyRent quotations error: {e}")
-        # Manteniamo INVARIATO lo schema di output dell'endpoint (QuotationResponse)
-        return QuotationResponse.model_validate(converted)
-
+def quotations(req: QuotationRequest, auth: bool = Depends(require_api_key)):
     start = parse_dt(req.startDate)
     end = parse_dt(req.endDate)
     if end <= start:
@@ -1092,7 +962,32 @@ def quotations(
         for item in items
     ]
 
-    # ✅ CHANGE: niente più optionals/TotalCharge a livello root (sono dentro Vehicles[*])
+    # TotalCharge = min totale tra i veicoli disponibili (se non c'è, 0)
+    min_total = None
+    min_pre_vat = None
+    for vs in vehicles_out:
+        calc = (vs.Reference or {}).get("calculated", {})
+        tot = calc.get("total")
+        pre = calc.get("pre_vat")
+        if tot is not None and (min_total is None or tot < min_total):
+            min_total = tot
+            min_pre_vat = pre
+    if min_total is None:
+        min_total = 0.0
+        min_pre_vat = 0.0
+
+    # optionals d'esempio (sempre presenti così il frontend li vede)
+    optionals = [
+        OptionalItem(
+            Charge=Charge(Amount=8.0 * days, Description="CHILD SEAT", TaxInclusive=False),
+            Equipment=Equipment(Description="Seggiolino bimbo", EquipType="BABY", Quantity=1, isMultipliable=True)
+        ),
+        OptionalItem(
+            Charge=Charge(Amount=12.0 * days, Description="ADDITIONAL DRIVER", TaxInclusive=False),
+            Equipment=Equipment(Description="Guidatore aggiuntivo", EquipType="ADDITIONAL", Quantity=1, isMultipliable=False)
+        ),
+    ]
+
     data = QuotationData(
         total=len(vehicles_out),
         PickUpLocation=req.pickupLocation,
@@ -1100,6 +995,11 @@ def quotations(
         PickUpDateTime=start.isoformat() + "Z",
         ReturnDateTime=end.isoformat() + "Z",
         Vehicles=vehicles_out,
+        optionals=optionals,
+        total_charge=TotalCharge(
+            EstimatedTotalAmount=round(min_total, 2),
+            RateTotalAmount=round(min_pre_vat, 2)
+        )
     )
     return QuotationResponse(data=data)
 
@@ -1119,7 +1019,6 @@ def get_damages(plate_or_vin: str, auth: bool = Depends(require_api_key)):
         "wireframeImage": WireframeImage(image=PLACEHOLDER_WIREFRAME_B64, height=353, width=698).model_dump()
     }
     return DamagesResponse(data=payload)
-
 class VehicleParameterRaw(BaseModel):
     name: str
     description: str
