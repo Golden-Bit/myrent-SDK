@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+from datetime import datetime, timedelta
+from threading import Lock
+import time
 """
 myrent_adapter.py
 
@@ -19,7 +22,6 @@ Uso tipico (dentro FastAPI):
 
 from dataclasses import asdict
 from typing import Any, Dict, List, Optional, Union, Tuple
-from datetime import datetime
 import os
 import math
 import logging
@@ -206,6 +208,19 @@ class MyRentAdapter:
             timeout=float(timeout),
             logger=self.log,
         )
+
+        # ------------------- Vehicles cache (in-memory, thread-safe) -------------------
+        # TTL configurabile via env, default 300s (5 minuti)
+        ttl_env = os.getenv("MYRENT_VEHICLES_CACHE_TTL_SEC", "300")
+        try:
+            self._vehicles_cache_ttl_sec = max(0, int(ttl_env))
+        except Exception:
+            self._vehicles_cache_ttl_sec = 300
+
+        self._vehicles_cache_lock = Lock()
+        # cache structure:
+        #   key -> {"ts": float(monotonic), "data": List[Dict[str, Any]]}
+        self._vehicles_cache: Dict[str, Dict[str, Any]] = {}
 
     # ----------------------------- Factory da ENV -----------------------------
     @classmethod
@@ -857,3 +872,247 @@ class MyRentAdapter:
             return dict(getattr(obj, "__dict__", {}) or {})
         except Exception:
             return {}
+
+    def _vehicles_cache_key(self, *, location: str, age: int, channel: Optional[str]) -> str:
+        """
+        Chiave cache. Include location + age + channel.
+        (Se vuoi cache separata per macroDescription ecc, aggiungi qui i campi.)
+        """
+        loc = (location or "").strip().upper()
+        ch = (channel or "").strip().upper()
+        return f"{loc}|age={int(age)}|channel={ch}"
+
+    def _vehicles_cache_get(self, key: str) -> Optional[List[Dict[str, Any]]]:
+        """
+        Ritorna data se presente e non scaduta.
+        """
+        if self._vehicles_cache_ttl_sec <= 0:
+            return None
+
+        now = time.monotonic()
+        with self._vehicles_cache_lock:
+            entry = self._vehicles_cache.get(key)
+            if not entry:
+                return None
+
+            ts = entry.get("ts")
+            data = entry.get("data")
+            if not isinstance(ts, (int, float)) or not isinstance(data, list):
+                # entry corrotta -> elimina
+                self._vehicles_cache.pop(key, None)
+                return None
+
+            if (now - float(ts)) > float(self._vehicles_cache_ttl_sec):
+                # expired
+                self._vehicles_cache.pop(key, None)
+                return None
+
+            # ritorna direttamente la lista (è ok; se vuoi immutabilità, fai copy)
+            return data
+
+    def _vehicles_cache_set(self, key: str, data: List[Dict[str, Any]]) -> None:
+        """
+        Salva data in cache.
+        """
+        if self._vehicles_cache_ttl_sec <= 0:
+            return
+
+        now = time.monotonic()
+        with self._vehicles_cache_lock:
+            self._vehicles_cache[key] = {"ts": now, "data": data}
+
+    def _vehicles_cache_prune(self) -> None:
+        """
+        Pulizia best-effort: rimuove entry scadute.
+        La puoi chiamare occasionalmente (es. prima di set) per evitare crescita memoria.
+        """
+        if self._vehicles_cache_ttl_sec <= 0:
+            return
+
+        now = time.monotonic()
+        with self._vehicles_cache_lock:
+            dead = []
+            for k, entry in self._vehicles_cache.items():
+                ts = entry.get("ts")
+                if not isinstance(ts, (int, float)):
+                    dead.append(k)
+                    continue
+                if (now - float(ts)) > float(self._vehicles_cache_ttl_sec):
+                    dead.append(k)
+            for k in dead:
+                self._vehicles_cache.pop(k, None)
+
+    def _vehicle_status_to_vehicle_group_raw(
+        self,
+        vs: Dict[str, Any],
+        *,
+        location: str,
+    ) -> Optional[Dict[str, Any]]:
+        veh = vs.get("Vehicle") if isinstance(vs.get("Vehicle"), dict) else {}
+        ref = vs.get("Reference") if isinstance(vs.get("Reference"), dict) else {}
+        calc = ref.get("calculated") if isinstance(ref.get("calculated"), dict) else {}
+
+        vid = veh.get("id")
+        international_code = veh.get("Code")
+        if not international_code:
+            return None
+
+        national_code = veh.get("nationalCode")
+
+        display_name = veh.get("model")
+        if not display_name:
+            vmm = veh.get("VehMakeModel")
+            if isinstance(vmm, list) and vmm and isinstance(vmm[0], dict):
+                display_name = vmm[0].get("Name")
+
+        vendor_macro = veh.get("VendorCarMacroGroup")
+        vehicle_type = veh.get("VendorCarType")
+
+        seats = veh.get("seats")
+        doors = veh.get("doors")
+        transmission = veh.get("transmission")
+        fuel = veh.get("fuel")
+        aircon = veh.get("aircon")
+
+        image_url = None
+        gp = vs.get("groupPic") if isinstance(vs.get("groupPic"), dict) else {}
+        if gp.get("url"):
+            image_url = gp.get("url")
+        if not image_url and isinstance(veh.get("imageUrl"), str):
+            image_url = veh.get("imageUrl")
+
+        daily_rate = _coerce_float(calc.get("base_daily"))
+
+        return {
+            "id": vid,
+            "national_code": national_code,
+            "international_code": international_code,
+            "description": None,
+            "display_name": display_name,
+            "vendor_macro": vendor_macro,
+            "vehicle_type": vehicle_type,
+            "seats": _coerce_int(seats),
+            "doors": _coerce_int(doors),
+            "transmission": transmission,
+            "fuel": fuel,
+            "aircon": _coerce_bool(aircon),
+            "image_url": image_url,
+            "daily_rate": daily_rate,
+            "locations": [location],
+            "plates": None,
+            "vehicle_parameters": None,
+            "damages": None,
+        }
+
+    def list_vehicles_by_location(
+        self,
+        location: str,
+        *,
+        age: int = 30,
+        channel: Optional[str] = None,
+    ) -> List[Dict[str, Any]]:
+        """
+        - Cache in memoria (TTL) per evitare 8 quotazioni ad ogni refresh.
+        - Se cache miss: 8 quotazioni (oggi+5 e oggi+10 × 2/4/6/8 giorni), merge & dedupe.
+        - Output: lista di dict compatibili con VehicleGroupRaw (schema /vehicles invariato).
+        """
+        self._ensure_authenticated()
+
+        loc = (location or "").strip().upper()
+        if not loc:
+            raise MyRentAdapterError("location vuota per list_vehicles_by_location(source=MYRENT)")
+
+        # ------------------- CACHE GET -------------------
+        cache_key = self._vehicles_cache_key(location=loc, age=int(age), channel=channel)
+        cached = self._vehicles_cache_get(cache_key)
+        if cached is not None:
+            return cached
+
+        # (best-effort) pulizia entry scadute per limitare crescita memoria
+        self._vehicles_cache_prune()
+
+        # ------------------- 8 PROBE QUOTATIONS -------------------
+        start_offsets_days = [5, 10]
+        durations_days = [2, 4, 6, 8]
+
+        # orario stabile 10:00 UTC (evita outliers notturni)
+        now = datetime.utcnow()
+        base_time = now.replace(hour=10, minute=0, second=0, microsecond=0)
+
+        merged: Dict[str, Dict[str, Any]] = {}
+        errors: List[str] = []
+
+        for off in start_offsets_days:
+            start_dt = base_time + timedelta(days=off)
+            for dur in durations_days:
+                wrapper_req = self._build_probe_wrapper_req(
+                    location=loc,
+                    start=start_dt,
+                    duration_days=dur,
+                    age=int(age),
+                    channel=channel,
+                )
+
+                try:
+                    q = self.get_quotations(wrapper_req)  # -> {"data": {...}}
+                    vehicles = (q.get("data") or {}).get("Vehicles") or []
+                except Exception as e:
+                    self.log.warning(
+                        "Probe quotations failed loc=%s off=%s dur=%s: %s",
+                        loc, off, dur, e
+                    )
+                    errors.append(f"off={off} dur={dur}: {e}")
+                    continue
+
+                for vs in vehicles:
+                    if not isinstance(vs, dict):
+                        continue
+
+                    item = self._vehicle_status_to_vehicle_group_raw(vs, location=loc)
+                    if not item:
+                        continue
+
+                    key = str(item.get("id") or item.get("international_code") or "")
+                    if not key:
+                        continue
+
+                    if key not in merged:
+                        merged[key] = item
+                    else:
+                        existing = merged[key]
+
+                        # merge non distruttivo: riempi campi mancanti
+                        for k in [
+                            "national_code", "display_name", "vendor_macro", "vehicle_type",
+                            "seats", "doors", "transmission", "fuel", "aircon", "image_url"
+                        ]:
+                            if existing.get(k) in (None, "", 0) and item.get(k) not in (None, "", 0):
+                                existing[k] = item[k]
+
+                        # daily_rate: tieni il MIN (prezzo "da")
+                        ex_dr = _coerce_float(existing.get("daily_rate"))
+                        it_dr = _coerce_float(item.get("daily_rate"))
+                        if ex_dr is None:
+                            existing["daily_rate"] = it_dr
+                        elif it_dr is not None:
+                            existing["daily_rate"] = min(ex_dr, it_dr)
+
+                        # locations: unione (qui di fatto loc, ma robusto)
+                        ex_locs = existing.get("locations") or []
+                        it_locs = item.get("locations") or []
+                        existing["locations"] = _unique(list(ex_locs) + list(it_locs))
+
+        out = list(merged.values())
+
+        # Se tutte fallite -> errore (FastAPI risponde 502)
+        if not out and errors:
+            raise MyRentAdapterError("Tutte le probe quotations sono fallite: " + " | ".join(errors[:5]))
+
+        # ordinamento stabile (UX + paginazione consistente)
+        out.sort(key=lambda x: (str(x.get("vendor_macro") or ""), str(x.get("international_code") or "")))
+
+        # ------------------- CACHE SET -------------------
+        # Salva anche lista vuota (se vuoi evitare hammering su location senza risultati)
+        self._vehicles_cache_set(cache_key, out)
+
+        return out

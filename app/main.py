@@ -1174,11 +1174,15 @@ class VehiclesPage(BaseModel):
     tags=["vehicles"],
     summary="Catalogo veicoli (impaginato)",
     description=(
-        "Ritorna il catalogo veicoli dal file 'vehicles.json' con impaginazione.\n"
-        "Autenticazione via header `X-API-Key` o `tokenValue`.\n"
-        "Filtra opzionalmente per `location` (codice sede, es. FCO). "
-        "Se non specificata, restituisce i veicoli per tutte le location."
+            "Ritorna il catalogo veicoli con impaginazione.\n"
+            "Autenticazione via header `X-API-Key` o `tokenValue`.\n"
+            "Query:\n"
+            "- `location` (opzionale in DEFAULT, obbligatoria in MYRENT)\n"
+            "- `source` = DEFAULT | MYRENT\n"
+            "- `skip`, `page_size`\n"
+            "In modalità MYRENT esegue probe quotations e merge dei risultati senza cambiare lo schema di output."
     ),
+
 )
 def list_vehicles(
     location: Optional[str] = Query(
@@ -1186,19 +1190,53 @@ def list_vehicles(
         description="Filtro opzionale per codice location (es. FCO, MXP, FLR, ...)",
         examples=["FCO"]
     ),
-    skip: int = Query(
-        default=0,
-        ge=0,
-        description="Offset dei risultati (0-based). Esempio: 0, 25, 50..."
-    ),
-    page_size: int = Query(
-        default=25,
-        gt=0,
-        le=100,
-        description="Dimensione pagina (1-100)."
+    skip: int = Query(default=0, ge=0, description="Offset dei risultati (0-based). Esempio: 0, 25, 50..."),
+    page_size: int = Query(default=25, gt=0, le=100, description="Dimensione pagina (1-100)."),
+    source: DataSource = Query(
+        default=DataSource.DEFAULT,
+        description="Fonte dati: DEFAULT (mock) oppure MYRENT (live via SDK)",
+        examples=["DEFAULT"],
     ),
     auth: bool = Depends(require_api_key),
 ):
+
+    if source == DataSource.MYRENT:
+        if not location:
+            raise HTTPException(
+                status_code=400,
+                detail="location è obbligatoria quando source=MYRENT"
+            )
+
+        adapter = get_myrent_adapter()
+
+        try:
+            # ✅ usa cache interna nell'adapter (vedi sezione 2)
+            all_items = adapter.list_vehicles_by_location(location.strip().upper())
+        except Exception as e:
+            raise HTTPException(status_code=502, detail=f"MyRent vehicles error: {e}")
+
+        # paginazione identica a DEFAULT
+        total = len(all_items)
+        start = skip
+        end = skip + page_size
+        page_items = all_items[start:end]
+
+        items_model = [VehicleGroupRaw(**item) for item in page_items]
+
+        has_next = end < total
+        next_skip = end if has_next else None
+        prev_skip = max(0, skip - page_size) if skip > 0 else None
+
+        return VehiclesPage(
+            total=total,
+            skip=skip,
+            page_size=page_size,
+            has_next=has_next,
+            next_skip=next_skip,
+            prev_skip=prev_skip,
+            items=items_model,
+        )
+
     # 1) Sorgente dati
     groups: List[dict] = VEH_DATA.get("groups", [])
 

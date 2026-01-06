@@ -234,17 +234,20 @@ class MyRentAdapter:
         password = os.getenv("MYRENT_PASSWORD")
         company_code = os.getenv("MYRENT_COMPANY_CODE")
 
-        missing = [k for k, v in {
-            "MYRENT_BASE_URL": base_url,
-            "MYRENT_USER_ID": user_id,
-            "MYRENT_PASSWORD": password,
-            "MYRENT_COMPANY_CODE": company_code,
-        }.items() if not v]
+        missing = [
+            k
+            for k, v in {
+                "MYRENT_BASE_URL": base_url,
+                "MYRENT_USER_ID": user_id,
+                "MYRENT_PASSWORD": password,
+                "MYRENT_COMPANY_CODE": company_code,
+            }.items()
+            if not v
+        ]
 
         if missing:
             raise MyRentAdapterError(
-                "Configurazione MyRent mancante. Imposta le variabili ambiente: "
-                + ", ".join(missing)
+                "Configurazione MyRent mancante. Imposta le variabili ambiente: " + ", ".join(missing)
             )
 
         timeout_env = os.getenv("MYRENT_TIMEOUT")
@@ -482,6 +485,80 @@ class MyRentAdapter:
         return out
 
     # ----------------------------- Internals: conversions -----------------------------
+    def _normalize_transmission(self, v: Any) -> Optional[str]:
+        """
+        Normalizza il campo trasmissione in una stringa compatibile col wrapper:
+        - "M" per manuale
+        - "A" per automatico
+
+        MyRent può restituire:
+          - stringhe ("M", "A", "MANUALE", "AUTOMATICO", ...)
+          - dict (es. {"id": 2, "description": "MANUALE"})
+          - int (es. 1/2) in alcuni ambienti
+        """
+        if v is None:
+            return None
+
+        # già stringa
+        if isinstance(v, str):
+            s = v.strip()
+            if not s:
+                return None
+            su = s.upper()
+            if su in {"M", "MAN", "MANUALE", "MANUAL"}:
+                return "M"
+            if su in {"A", "AUT", "AUTO", "AUTOMATICO", "AUTOMATIC"}:
+                return "A"
+            # euristica
+            if "MAN" in su:
+                return "M"
+            if "AUT" in su or "AUTO" in su:
+                return "A"
+            # fallback: accetta la stringa così com'è (meglio di un dict)
+            return s
+
+        # dict tipo {"id": 2, "description": "MANUALE"}
+        if isinstance(v, dict):
+            desc = v.get("description") or v.get("Description") or v.get("name") or v.get("Name")
+            code = v.get("code") or v.get("Code")
+            vid = v.get("id") or v.get("ID")
+
+            # prova description
+            if isinstance(desc, str) and desc.strip():
+                return self._normalize_transmission(desc)
+
+            # prova code
+            if isinstance(code, str) and code.strip():
+                return self._normalize_transmission(code)
+
+            # prova id numerico
+            vid_int = _coerce_int(vid)
+            if vid_int is not None:
+                # euristica comune: 1=manuale, 2=automatico (se diverso, la description sopra avrebbe già funzionato)
+                if vid_int == 1:
+                    return "M"
+                if vid_int == 2:
+                    return "A"
+                return str(vid_int)
+
+            return None
+
+        # numeri
+        if isinstance(v, (int, float)) and not isinstance(v, bool):
+            vi = _coerce_int(v)
+            if vi == 1:
+                return "M"
+            if vi == 2:
+                return "A"
+            return str(v)
+
+        # fallback robusto: evita di ritornare dict/oggetti
+        try:
+            s = str(v).strip()
+            return s or None
+        except Exception:
+            return None
+
     def _convert_vehicle_status(
         self,
         vs: Dict[str, Any],
@@ -496,7 +573,6 @@ class MyRentAdapter:
         veh_raw = vs.get("Vehicle") if isinstance(vs.get("Vehicle"), dict) else {}
 
         # groupPic (MyRent la mette spesso dentro Vehicle)
-        group_pic_raw = None
         if isinstance(veh_raw.get("groupPic"), dict):
             group_pic_raw = veh_raw.get("groupPic")
         elif isinstance(vs.get("groupPic"), dict):
@@ -535,6 +611,11 @@ class MyRentAdapter:
 
         fuel = veh_raw.get("fuel") or veh_raw.get("fuelType")
 
+        # ✅ FIX: normalizzazione transmission (evita dict -> errore Pydantic)
+        transmission_norm = self._normalize_transmission(
+            veh_raw.get("transmission") or veh_raw.get("Transmission")
+        )
+
         locations = _unique([pickup_loc, dropoff_loc])
 
         # TotalCharge: normalizza in (pre_vat, total_vat_incl)
@@ -557,7 +638,6 @@ class MyRentAdapter:
         # vehicleParameter: prendi da Vehicle.vehicleParameter o VehicleStatus.vehicleParameter
         vparams_out = None
         if _coerce_bool(wrapper_req.get("showVehicleParameter")):
-            params_raw = None
             if isinstance(vs.get("vehicleParameter"), list):
                 params_raw = vs.get("vehicleParameter")
             elif isinstance(veh_raw.get("vehicleParameter"), list):
@@ -641,7 +721,7 @@ class MyRentAdapter:
             "VendorCarType": veh_raw.get("VendorCarType"),
             "seats": seats,
             "doors": _coerce_int(veh_raw.get("doors")) or None,
-            "transmission": veh_raw.get("transmission"),
+            "transmission": transmission_norm,  # ✅ FIX QUI
             "fuel": fuel,
             "aircon": aircon,
             "imageUrl": (veh_raw.get("vehicleGroupPic") or None) or None,
@@ -777,3 +857,4 @@ class MyRentAdapter:
             return dict(getattr(obj, "__dict__", {}) or {})
         except Exception:
             return {}
+
