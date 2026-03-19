@@ -1,0 +1,16 @@
+{
+  "firstName": "Luca",
+  "lastName": "Bianchi",
+  "mobileNumber": "+393401112233",
+  "email": "luca.bianchi@example.com",
+  "birthPlace": "Bari",
+  "birthDate": "1988-06-15",
+  "birthProvince": "BA",
+  "taxCode": "BNCLCU88H15A662Z",
+  "document": "PATENTE",
+  "documentNumber": "X1234567",
+  "licenceType": "B",
+  "issueBy": "Bari",
+  "releaseDate": "2018-05-10",
+  "expiryDate": "2028-05-10"
+}

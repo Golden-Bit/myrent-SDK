@@ -721,6 +721,26 @@ class QuotationRequest(BaseModel):
 def parse_dt(s: str) -> datetime:
     return datetime.fromisoformat(s.replace("Z", ""))
 
+def _exclude_ghost_locations(locations: List[Any]) -> List[Any]:
+    """
+    Esclude tutte le location che hanno 'GHOST' nel nome, case-insensitive.
+    Funziona sia con oggetti Pydantic Location sia con dict.
+    """
+    filtered: List[Any] = []
+
+    for loc in locations or []:
+        if isinstance(loc, dict):
+            name = str(loc.get("locationName") or "")
+        else:
+            name = str(getattr(loc, "locationName", "") or "")
+
+        if "GHOST" in name.upper():
+            continue
+
+        filtered.append(loc)
+
+    return filtered
+
 # ---- Locations/Damages (invariati, ma inclusi per completezza) --------------
 class WeekOfDay(BaseModel):
     dayOfTheWeek: int
@@ -851,6 +871,155 @@ LOCATIONS: List[Location] = [
         country="ITALIA", zipCode="07041"
     ),
 ]
+
+class ReservationFlowBookingInput(BaseModel):
+    pickupLocation: str
+    dropOffLocation: str
+    startDate: str
+    endDate: str
+    vehicleCode: str
+    channel: Optional[str] = None
+    optionals: List[Dict[str, Any]] = Field(default_factory=list)
+    youngDriverFee: Optional[float] = None
+    seniorDriverFee: Optional[float] = None
+    seniorDriverFeeDesc: Optional[str] = None
+    youngDriverFeeDesc: Optional[str] = None
+    onlineUser: Optional[int] = None
+    insuranceId: Optional[int] = None
+    agreementCoupon: Optional[str] = None
+    TransactionStatusCode: Optional[str] = None
+    PayNowDis: Optional[str] = None
+    isYoungDriverAge: Optional[bool] = None
+    isSeniorDriverAge: Optional[bool] = None
+    vehicleRequest: Optional[Dict[str, Any]] = None
+
+    @field_validator("startDate", "endDate")
+    @classmethod
+    def validate_iso_booking(cls, v: str):
+        try:
+            datetime.fromisoformat(v.replace("Z", ""))
+        except Exception:
+            raise ValueError(f"Invalid ISO datetime: {v}")
+        return v
+
+
+class ReservationFlowCustomerInput(BaseModel):
+    model_config = ConfigDict(populate_by_name=True, extra="allow")
+
+    firstName: Optional[str] = None
+    lastName: Optional[str] = None
+    middleName: Optional[str] = None
+    email: Optional[str] = None
+    mobileNumber: Optional[str] = None
+    country: Optional[str] = None
+    city: Optional[str] = None
+    zip: Optional[str] = None
+    street: Optional[str] = None
+    num: Optional[str] = None
+    taxCode: Optional[str] = None
+    birthDate: Optional[str] = None
+    birthPlace: Optional[str] = None
+    birthProvince: Optional[str] = None
+    birthNation: Optional[str] = None
+    vatNumber: Optional[str] = None
+    document: Optional[str] = None
+    documentNumber: Optional[str] = None
+    licenceType: Optional[str] = None
+    issueBy: Optional[str] = None
+    releaseDate: Optional[str] = None
+    expiryDate: Optional[str] = None
+    isPhysicalPerson: Optional[bool] = None
+    isIndividualCompany: Optional[bool] = None
+
+
+class ReservationFlowDriverInput(BaseModel):
+    model_config = ConfigDict(populate_by_name=True, extra="allow")
+
+    firstName: str
+    lastName: str
+    middleName: Optional[str] = None
+    ragioneSociale: Optional[str] = None
+    codice: Optional[Union[str, int]] = None
+    street: Optional[str] = None
+    num: Optional[str] = None
+    city: Optional[str] = None
+    zip: Optional[str] = None
+    country: Optional[str] = None
+    state: Optional[str] = None
+    phNum1: Optional[str] = None
+    phNum2: Optional[str] = None
+    mobileNumber: Optional[str] = None
+    email: Optional[str] = None
+    vatNumber: Optional[str] = None
+    birthPlace: Optional[str] = None
+    birthDate: Optional[str] = None
+    birthProvince: Optional[str] = None
+    birthNation: Optional[str] = None
+    gender: Optional[bool] = None
+    taxCode: Optional[str] = None
+    document: Optional[str] = None
+    document2: Optional[str] = None
+    documentNumber: Optional[str] = None
+    documentNumber2: Optional[str] = None
+    licenceType: Optional[str] = None
+    issueBy: Optional[str] = None
+    issueBy2: Optional[str] = None
+    releaseDate: Optional[str] = None
+    releaseDate2: Optional[str] = None
+    expiryDate: Optional[str] = None
+    expiryDate2: Optional[str] = None
+
+
+class ReservationComposeRequest(BaseModel):
+    booking: ReservationFlowBookingInput
+    customer: ReservationFlowCustomerInput
+    customerUpdate: Optional[ReservationFlowCustomerInput] = None
+    driver1: Optional[ReservationFlowDriverInput] = None
+    driver2: Optional[ReservationFlowDriverInput] = None
+    driver3: Optional[ReservationFlowDriverInput] = None
+
+
+class ReservationComposeResponse(BaseModel):
+    booking_id: str
+    reservation_id_internal: Union[str, int]
+    customer_id: Optional[Union[str, int]] = None
+    channel: str
+    booking_create: Dict[str, Any]
+    booking_detail: Dict[str, Any]
+    customer_before_update: Optional[Dict[str, Any]] = None
+    customer_after_update: Optional[Dict[str, Any]] = None
+    used_customer_as_driver1: bool
+    set_customer_as_driver1_result: Optional[Dict[str, Any]] = None
+    driver1_result: Optional[Dict[str, Any]] = None
+    driver2_result: Optional[Dict[str, Any]] = None
+    driver3_result: Optional[Dict[str, Any]] = None
+
+
+class ReservationFullDetailsResponse(BaseModel):
+    reservation_id_internal: Union[str, int]
+    booking_id: str
+    channel: str
+    customer_id: Optional[Union[str, int]] = None
+    booking_detail: Dict[str, Any]
+    customer: Optional[Dict[str, Any]] = None
+
+    used_customer_as_driver1: Optional[bool] = None
+    set_customer_as_driver1_result: Optional[Dict[str, Any]] = None
+    driver1_result: Optional[Dict[str, Any]] = None
+    driver2_result: Optional[Dict[str, Any]] = None
+    driver3_result: Optional[Dict[str, Any]] = None
+
+    reservation_web_checkin: Optional[Dict[str, Any]] = None
+
+    customer_first_name: Optional[str] = None
+    customer_last_name: Optional[str] = None
+
+    driver1: Optional[str] = None
+    driver1_id: Optional[int] = None
+    driver2: Optional[str] = None
+    driver2_id: Optional[int] = None
+    driver3: Optional[str] = None
+    driver3_id: Optional[int] = None
 
 # ---- Pricing utilities -------------------------------------------------------
 def season_multiplier(dt: datetime) -> float:
@@ -1034,7 +1203,6 @@ def build_vehicle_status(item: dict, days: int, start: datetime, end: datetime,
 def health():
     return {"status": "ok", "version": API_VERSION}
 
-# NB: qui puoi incollare la lista LOCATIONS identica al tuo file (omessa per brevità)
 @app.get("/api/v1/touroperator/locations", response_model=List[Location], tags=["locations"])
 def list_locations(
     source: DataSource = Query(
@@ -1044,11 +1212,12 @@ def list_locations(
     ),
     auth: bool = Depends(require_api_key),
 ):
-    # restituisci eventuale lista LOCATIONS definita come nel tuo file originale
     if source == DataSource.DEFAULT:
-        return LOCATIONS  # <-- mock locale
+        return _exclude_ghost_locations(LOCATIONS)
+
     adapter = get_myrent_adapter()
-    return adapter.get_locations()
+    locations = adapter.get_locations()
+    return _exclude_ghost_locations(locations)
 
 @app.post("/api/v1/touroperator/quotations", response_model=QuotationResponse, tags=["quotations"])
 def quotations(
@@ -1293,5 +1462,157 @@ def get_vehicle_by_id(
     if not found:
         raise HTTPException(status_code=404, detail=f"Vehicle id '{vehicle_id}' not found")
     return VehicleGroupRaw(**found)
+
+
+@app.post(
+    "/api/v1/touroperator/reservations/compose",
+    response_model=ReservationComposeResponse,
+    tags=["reservations"],
+    summary="Crea booking + completa reservation/customer/drivers",
+    description=(
+        "Crea un booking via SDK booking, poi legge il booking detail per ottenere "
+        "reservation_id interno (dbId) e customer_id, aggiorna il customer via web-checkin "
+        "e gestisce i driver. Se nessun driver è fornito, imposta il customer come driver1."
+    ),
+)
+def create_reservation_compose(
+    req: ReservationComposeRequest,
+    source: DataSource = Query(
+        default=DataSource.MYRENT,
+        description="Per questo endpoint usare MYRENT",
+    ),
+    auth: bool = Depends(require_api_key),
+):
+    if source != DataSource.MYRENT:
+        raise HTTPException(
+            status_code=400,
+            detail="Questo endpoint è disponibile solo con source=MYRENT",
+        )
+
+    adapter = get_myrent_adapter()
+    try:
+        result = adapter.create_reservation_flow(
+            req.model_dump(by_alias=True, exclude_none=True)
+        )
+        return ReservationComposeResponse.model_validate(result)
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"MyRent reservation compose error: {e}")
+
+@app.get(
+    "/api/v1/touroperator/reservations/{reservation_id}",
+    response_model=ReservationFullDetailsResponse,
+    tags=["reservations"],
+    summary="Dettagli reservation da reservation id interno",
+    description=(
+        "Ritorna i dettagli completi di una reservation creata tramite questa wrapper. "
+        "La risoluzione usa un indice interno reservation_id -> booking_id/channel/customer_id "
+        "e interroga anche il web-checkin per il dettaglio reservation live."
+    ),
+)
+def get_reservation_details(
+    reservation_id: str,
+    source: DataSource = Query(
+        default=DataSource.MYRENT,
+        description="Per questo endpoint usare MYRENT",
+    ),
+    auth: bool = Depends(require_api_key),
+):
+    if source != DataSource.MYRENT:
+        raise HTTPException(
+            status_code=400,
+            detail="Questo endpoint è disponibile solo con source=MYRENT",
+        )
+
+    adapter = get_myrent_adapter()
+
+    try:
+        from app.myrent_adapter import MyRentAdapterError
+    except Exception:
+        MyRentAdapterError = RuntimeError
+
+    try:
+        result = adapter.get_reservation_full_details(reservation_id)
+        return ReservationFullDetailsResponse.model_validate(result)
+
+    except MyRentAdapterError as e:
+        msg = str(e)
+        if "non trovato nell'indice" in msg:
+            raise HTTPException(status_code=404, detail=msg)
+        raise HTTPException(status_code=502, detail=f"MyRent reservation details error: {msg}")
+
+    except HTTPException:
+        raise
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Internal wrapper error: {e}")
+
+@app.get(
+    "/api/v1/touroperator/reservations/details/by-code",
+    response_model=ReservationFullDetailsResponse,
+    tags=["reservations"],
+    summary="Dettagli reservation da reservation code + email + data",
+    description=(
+        "Ritorna i dettagli completi di una reservation risolta live tramite web-checkin "
+        "usando reservation code esterno (es. 'SUL 123' o 'SUL 123 TESTDOGMA'), "
+        "email del customer e reservationDate (reservation date o pick-up date)."
+    ),
+)
+def get_reservation_details_by_code(
+    reservationCode: str = Query(
+        ...,
+        description="Codice reservation esterno, es. 'SUL 123' oppure 'SUL 123 TESTDOGMA'",
+    ),
+    customerEmail: str = Query(
+        ...,
+        description="Email del customer usata per validazione di sicurezza",
+    ),
+    reservationDate: str = Query(
+        ...,
+        description="Data nel formato yyyy-MM-dd; può essere reservation date o pick-up date",
+    ),
+    source: DataSource = Query(
+        default=DataSource.MYRENT,
+        description="Per questo endpoint usare MYRENT",
+    ),
+    auth: bool = Depends(require_api_key),
+):
+    if source != DataSource.MYRENT:
+        raise HTTPException(
+            status_code=400,
+            detail="Questo endpoint è disponibile solo con source=MYRENT",
+        )
+
+    adapter = get_myrent_adapter()
+
+    try:
+        from app.myrent_adapter import MyRentAdapterError
+    except Exception:
+        MyRentAdapterError = RuntimeError
+
+    try:
+        result = adapter.get_reservation_full_details_by_code_and_email(
+            reservation_code=reservationCode,
+            customer_email=customerEmail,
+            reservation_date=reservationDate,
+        )
+        return ReservationFullDetailsResponse.model_validate(result)
+
+    except MyRentAdapterError as e:
+        msg = str(e)
+
+        # mismatch email / reservation non trovata: risposta neutra
+        if "Reservation non trovata" in msg:
+            raise HTTPException(status_code=404, detail="Reservation non trovata")
+
+        if "Nessuna reservation trovata via web-checkin" in msg:
+            raise HTTPException(status_code=404, detail="Reservation non trovata")
+
+        raise HTTPException(status_code=502, detail=f"MyRent reservation details error: {msg}")
+
+    except HTTPException:
+        raise
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Internal wrapper error: {e}")
 
 # Esegui: uvicorn main:app --reload --port 8000

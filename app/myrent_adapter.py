@@ -3,21 +3,18 @@ from __future__ import annotations
 from datetime import datetime, timedelta
 from threading import Lock
 import time
+import json
+import re
+from pathlib import Path
+
 """
 myrent_adapter.py
 
 Classe "connettore/adapter" per:
-1) Recuperare Locations e Quotations da MyRent tramite **SDK esterno** (myrent_sdk.py)
-2) Convertire i payload MyRent nel formato richiesto dalla nostra wrapper API (FastAPI).
-
-Obiettivo:
-- Tenere INVARIATI gli schemi di input/output della wrapper API.
-- Offrire una conversione robusta (tollerante a campi mancanti o formati leggermente diversi).
-
-Uso tipico (dentro FastAPI):
-    adapter = MyRentAdapter.from_env()
-    locations = adapter.get_locations()
-    quotation_resp_dict = adapter.get_quotations(wrapper_req_dict)  # -> {"data": {...}}
+1) Recuperare Locations e Quotations da MyRent tramite SDK esterno (myrent_sdk.py)
+2) Convertire i payload MyRent nel formato richiesto dalla wrapper API (FastAPI)
+3) Gestire compose reservation + persistenza indice reservation su JSON locale
+4) Arricchire i reservation details interrogando anche il web-checkin
 """
 
 from dataclasses import asdict
@@ -31,13 +28,26 @@ import logging
 # --------------------------------------------------------------------------------------
 _IMPORT_ERROR: Optional[Exception] = None
 try:
-    # Il tuo SDK: deve essere importabile dal PYTHONPATH (package o file myrent_sdk.py)
     from myrent_sdk.main import (  # type: ignore
         MyRentClient,
         QuotationRequest as SDKQuotationRequest,
+        BookingRequest as SDKBookingRequest,
+        BookingCustomer as SDKBookingCustomer,
+        BookingVehicleRequest as SDKBookingVehicleRequest,
         APIError,
         AuthenticationError,
     )
+
+    from myrent_sdk.web_checkin import (  # type: ignore
+        MyRentWebCheckInClient,
+        CustomerUpdateRequest as WCCustomerUpdateRequest,
+        DriverCreateRequest as WCDriverCreateRequest,
+        ReservationLookupRequest as WCReservationLookupRequest,
+        ReservationVoucherSearchRequest as WCReservationVoucherSearchRequest,
+        APIError as WCAPIError,
+        AuthenticationError as WCAuthenticationError,
+    )
+
 except Exception as e:  # pragma: no cover
     _IMPORT_ERROR = e
     MyRentClient = None  # type: ignore
@@ -101,9 +111,6 @@ def _strip_z(s: str) -> str:
 
 
 def _parse_dt_any(value: Any) -> Optional[datetime]:
-    """
-    Converte stringhe ISO (con o senza 'Z', con o senza millisecondi) in datetime.
-    """
     if value is None:
         return None
     if isinstance(value, datetime):
@@ -117,7 +124,6 @@ def _parse_dt_any(value: Any) -> Optional[datetime]:
     try:
         return datetime.fromisoformat(s)
     except Exception:
-        # fallback minimali
         for fmt in ("%Y-%m-%dT%H:%M:%S", "%Y-%m-%d %H:%M:%S"):
             try:
                 return datetime.strptime(s, fmt)
@@ -126,19 +132,13 @@ def _parse_dt_any(value: Any) -> Optional[datetime]:
     return None
 
 
+
 def _fmt_dt_no_tz_seconds(value: Union[str, datetime]) -> str:
-    """
-    MyRent (in pratica) accetta spesso 'YYYY-MM-DDTHH:MM:SS' (senza Z).
-    Rende sicuro quel formato partendo da:
-    - datetime
-    - stringa ISO con/senza Z e con/senza ms
-    """
     if isinstance(value, datetime):
         return value.replace(microsecond=0).strftime("%Y-%m-%dT%H:%M:%S")
     if isinstance(value, str):
         dt = _parse_dt_any(value)
         if dt is None:
-            # se non parsabile, restituisci la stringa "così com'è" (ultima spiaggia)
             return value.strip()
         return dt.replace(microsecond=0).strftime("%Y-%m-%dT%H:%M:%S")
     raise TypeError("Datetime non valido")
@@ -158,6 +158,13 @@ def _unique(seq: List[Any]) -> List[Any]:
     return out
 
 
+def _pick(d: Dict[str, Any], *keys: str) -> Any:
+    for k in keys:
+        if k in d and d[k] is not None:
+            return d[k]
+    return None
+
+
 # --------------------------------------------------------------------------------------
 # Error type
 # --------------------------------------------------------------------------------------
@@ -172,10 +179,10 @@ class MyRentAdapter:
     """
     Adapter "importabile" che:
     - usa MyRentClient (SDK esterno)
-    - converte Locations e Quotations nel formato wrapper.
-
-    Nota: la wrapper API continuerà ad autenticarsi con la sua API KEY.
-    Questo adapter gestisce invece l'autenticazione "verso MyRent".
+    - usa MyRentWebCheckInClient (SDK esterno)
+    - converte Locations e Quotations nel formato wrapper
+    - gestisce compose reservation
+    - persiste localmente l'indice reservation_id -> booking/channel/customer + metadati
     """
 
     def __init__(
@@ -199,7 +206,7 @@ class MyRentAdapter:
         self.log = logger or logging.getLogger("myrent_adapter")
         self.vat_pct = int(vat_pct)
 
-        # istanza SDK
+        # istanza SDK booking
         self.client = MyRentClient(  # type: ignore[misc]
             base_url=base_url,
             user_id=user_id,
@@ -210,7 +217,6 @@ class MyRentAdapter:
         )
 
         # ------------------- Vehicles cache (in-memory, thread-safe) -------------------
-        # TTL configurabile via env, default 300s (5 minuti)
         ttl_env = os.getenv("MYRENT_VEHICLES_CACHE_TTL_SEC", "300")
         try:
             self._vehicles_cache_ttl_sec = max(0, int(ttl_env))
@@ -218,9 +224,36 @@ class MyRentAdapter:
             self._vehicles_cache_ttl_sec = 300
 
         self._vehicles_cache_lock = Lock()
-        # cache structure:
-        #   key -> {"ts": float(monotonic), "data": List[Dict[str, Any]]}
         self._vehicles_cache: Dict[str, Dict[str, Any]] = {}
+
+        # istanza SDK web-checkin
+        self.web_checkin_client = MyRentWebCheckInClient(
+            base_url=base_url,
+            user_id=user_id,
+            password=password,
+            company_code=company_code,
+            timeout=float(timeout),
+            logger=self.log,
+            portal_auth_mode=os.getenv(
+                "MYRENT_WEB_CHECKIN_AUTH_MODE",
+                "combined_then_token_then_basic",
+            ),
+        )
+
+        # ------------------- Reservation index persistito -------------------
+        self._reservation_index_lock = Lock()
+
+        default_index_path = Path(__file__).resolve().parent / "data" / "reservation_index.json"
+        index_path_env = os.getenv("MYRENT_RESERVATION_INDEX_PATH")
+
+        self._reservation_index_path = (
+            Path(index_path_env).expanduser().resolve()
+            if index_path_env
+            else default_index_path
+        )
+
+        self._reservation_index: Dict[str, Dict[str, Any]] = {}
+        self._load_reservation_index_from_disk()
 
     # ----------------------------- Factory da ENV -----------------------------
     @classmethod
@@ -231,19 +264,6 @@ class MyRentAdapter:
         vat_pct_default: int = 22,
         logger: Optional[logging.Logger] = None,
     ) -> "MyRentAdapter":
-        """
-        Crea l'adapter leggendo la configurazione da env vars.
-
-        Richieste:
-          - MYRENT_BASE_URL
-          - MYRENT_USER_ID
-          - MYRENT_PASSWORD
-          - MYRENT_COMPANY_CODE
-
-        Opzionali:
-          - MYRENT_TIMEOUT
-          - MYRENT_VAT_PCT
-        """
         base_url = os.getenv("MYRENT_BASE_URL")
         user_id = os.getenv("MYRENT_USER_ID")
         password = os.getenv("MYRENT_PASSWORD")
@@ -283,10 +303,6 @@ class MyRentAdapter:
 
     # ----------------------------- Auth verso MyRent -----------------------------
     def _ensure_authenticated(self) -> None:
-        """
-        Garantisce di avere token valido lato SDK.
-        Se manca, chiama authenticate().
-        """
         try:
             _ = self.client.token_value  # type: ignore[attr-defined]
             return
@@ -296,20 +312,352 @@ class MyRentAdapter:
         self.log.info("MyRentAdapter: token assente, eseguo authenticate() ...")
         self.client.authenticate()  # type: ignore[attr-defined]
 
+    def _ensure_web_checkin_authenticated(self) -> None:
+        try:
+            _ = self.web_checkin_client.token_value
+            return
+        except Exception:
+            pass
+
+        self.log.info("MyRentAdapter: web-checkin token assente, eseguo authenticate() ...")
+        self.web_checkin_client.authenticate_for_web_checkin()
+
+    def _normalize_channel(self, channel: Optional[str]) -> str:
+        ch = (channel or getattr(self.client, "company_code", None) or "").strip().replace(" ", "")
+        if not ch:
+            raise MyRentAdapterError("channel mancante e company_code non disponibile")
+        return ch
+
+    # ----------------------------- Reservation index persistence -----------------------------
+    def _ensure_reservation_index_parent_dir(self) -> None:
+        try:
+            self._reservation_index_path.parent.mkdir(parents=True, exist_ok=True)
+        except Exception as e:
+            raise MyRentAdapterError(
+                f"Impossibile creare directory reservation index: {self._reservation_index_path.parent} ({e})"
+            ) from e
+
+    def _load_reservation_index_from_disk(self) -> None:
+        self._ensure_reservation_index_parent_dir()
+
+        if not self._reservation_index_path.exists():
+            self.log.info("Reservation index assente, inizializzo vuoto: %s", self._reservation_index_path)
+            with self._reservation_index_lock:
+                self._reservation_index = {}
+            return
+
+        try:
+            raw = self._reservation_index_path.read_text(encoding="utf-8").strip()
+            data = json.loads(raw) if raw else {}
+            if not isinstance(data, dict):
+                data = {}
+
+            normalized: Dict[str, Dict[str, Any]] = {}
+            for k, v in data.items():
+                if not isinstance(v, dict):
+                    continue
+                rid = str(k).strip()
+                if not rid:
+                    continue
+                normalized[rid] = v
+
+            with self._reservation_index_lock:
+                self._reservation_index = normalized
+
+            self.log.info(
+                "Reservation index caricato da %s (%s record)",
+                self._reservation_index_path,
+                len(normalized),
+            )
+        except Exception as e:
+            self.log.warning(
+                "Errore lettura reservation index %s: %s. Uso indice vuoto.",
+                self._reservation_index_path,
+                e,
+            )
+            with self._reservation_index_lock:
+                self._reservation_index = {}
+
+    def _save_reservation_index_to_disk(self) -> None:
+        self._ensure_reservation_index_parent_dir()
+
+        with self._reservation_index_lock:
+            snapshot = dict(self._reservation_index)
+
+        tmp_path = self._reservation_index_path.with_suffix(self._reservation_index_path.suffix + ".tmp")
+
+        try:
+            tmp_path.write_text(
+                json.dumps(snapshot, ensure_ascii=False, indent=2, default=str),
+                encoding="utf-8",
+            )
+            tmp_path.replace(self._reservation_index_path)
+
+            self.log.info(
+                "Reservation index salvato su %s (%s record)",
+                self._reservation_index_path,
+                len(snapshot),
+            )
+        except Exception as e:
+            raise MyRentAdapterError(
+                f"Impossibile salvare reservation index su disco: {self._reservation_index_path} ({e})"
+            ) from e
+
+    def _index_reservation(
+        self,
+        reservation_id: Union[str, int],
+        booking_id: str,
+        channel: str,
+        customer_id: Optional[Union[str, int]],
+        extra: Optional[Dict[str, Any]] = None,
+    ) -> None:
+        rid = str(reservation_id).strip()
+        if not rid:
+            return
+
+        payload: Dict[str, Any] = {
+            "booking_id": str(booking_id).strip(),
+            "channel": str(channel).strip(),
+            "customer_id": None if customer_id is None else str(customer_id).strip(),
+        }
+
+        if extra and isinstance(extra, dict):
+            payload.update(extra)
+
+        with self._reservation_index_lock:
+            self._reservation_index[rid] = payload
+
+        self.log.info(
+            "Indexed reservation: reservation_id=%s booking_id=%s channel=%s customer_id=%s",
+            rid,
+            booking_id,
+            channel,
+            customer_id,
+        )
+
+        self._save_reservation_index_to_disk()
+
+    def _get_indexed_reservation(self, reservation_id: Union[str, int]) -> Optional[Dict[str, Any]]:
+        rid = str(reservation_id).strip()
+
+        with self._reservation_index_lock:
+            found = self._reservation_index.get(rid)
+
+        if found:
+            return found
+
+        self._load_reservation_index_from_disk()
+
+        with self._reservation_index_lock:
+            return self._reservation_index.get(rid)
+
+    # ----------------------------- Small helpers -----------------------------
+    def _customer_profile_to_dict(self, obj: Any) -> Optional[Dict[str, Any]]:
+        if obj is None:
+            return None
+        payload = obj.to_payload(include_status=True)
+        payload["raw"] = getattr(obj, "raw", {})
+        return payload
+
+    def _extract_date_only_iso(self, value: Any) -> Optional[str]:
+        dt = _parse_dt_any(value)
+        if dt is not None:
+            return dt.date().isoformat()
+
+        if isinstance(value, str):
+            s = value.strip()
+            if not s:
+                return None
+            if "T" in s:
+                return s.split("T", 1)[0]
+            if len(s) >= 10:
+                return s[:10]
+        return None
+
+    def _parse_booking_lookup_fields(
+        self,
+        booking_id: str,
+        booking_detail_dict: Optional[Dict[str, Any]] = None,
+        booking_data: Optional[Dict[str, Any]] = None,
+    ) -> Dict[str, Optional[str]]:
+        booking_str = str(booking_id or "").strip()
+
+        reservation_prefix: Optional[str] = None
+        reservation_number: Optional[str] = None
+        reservation_voucher: Optional[str] = None
+
+        # esempio atteso: "SUL 6268 TESTDOGMA"
+        m = re.match(r"^(?P<prefix>[A-Za-z]+)\s+(?P<number>\d+)(?:\s+(?P<voucher>.+))?$", booking_str)
+        if m:
+            reservation_prefix = m.group("prefix").strip()
+            reservation_number = m.group("number").strip()
+            reservation_voucher = (m.group("voucher") or "").strip() or None
+
+        reservation_date = None
+
+        if booking_data:
+            reservation_date = self._extract_date_only_iso(
+                _pick(booking_data, "start_date", "startDate")
+            )
+
+        if not reservation_date and booking_detail_dict:
+            reservation_date = self._extract_date_only_iso(
+                booking_detail_dict.get("pick_up_date_time")
+                or booking_detail_dict.get("pickUpDateTime")
+                or booking_detail_dict.get("pick_up_date")
+                or booking_detail_dict.get("pickUpDate")
+            )
+
+        return {
+            "reservation_prefix": reservation_prefix,
+            "reservation_number": reservation_number,
+            "reservation_date": reservation_date,
+            "reservation_voucher": reservation_voucher,
+        }
+
+    # ----------------------------- Builder SDK DTO -----------------------------
+    def _build_booking_customer(self, data: Dict[str, Any]) -> SDKBookingCustomer:
+        return SDKBookingCustomer(
+            first_name=_pick(data, "first_name", "firstName", "Name"),
+            last_name=_pick(data, "last_name", "lastName", "Surname"),
+            client_id=_pick(data, "client_id", "clientId"),
+            ragione_sociale=_pick(data, "ragione_sociale", "ragioneSociale"),
+            codice=_pick(data, "codice"),
+            street=_pick(data, "street"),
+            num=_pick(data, "num"),
+            city=_pick(data, "city"),
+            zip=_pick(data, "zip", "zipCode"),
+            country=_pick(data, "country"),
+            state=_pick(data, "state"),
+            ph_num1=_pick(data, "ph_num1", "phNum1"),
+            ph_num2=_pick(data, "ph_num2", "phNum2"),
+            mobile_number=_pick(data, "mobile_number", "mobileNumber"),
+            email=_pick(data, "email"),
+            vat_number=_pick(data, "vat_number", "vatNumber"),
+            birth_place=_pick(data, "birth_place", "birthPlace"),
+            birth_date=_pick(data, "birth_date", "birthDate"),
+            birth_province=_pick(data, "birth_province", "birthProvince"),
+            birth_nation=_pick(data, "birth_nation", "birthNation"),
+            gender=_coerce_bool(_pick(data, "gender")),
+            tax_code=_pick(data, "tax_code", "taxCode"),
+            document=_pick(data, "document"),
+            document_number=_pick(data, "document_number", "documentNumber"),
+            licence_type=_pick(data, "licence_type", "licenceType"),
+            issue_by=_pick(data, "issue_by", "issueBy"),
+            release_date=_pick(data, "release_date", "releaseDate"),
+            expiry_date=_pick(data, "expiry_date", "expiryDate"),
+            e_invoice_email=_pick(data, "e_invoice_email", "eInvoiceEmail"),
+            e_invoice_code=_pick(data, "e_invoice_code", "eInvoiceCode"),
+            is_physical_person=_pick(data, "is_physical_person", "isPhysicalPerson"),
+            is_individual_company=_pick(data, "is_individual_company", "isIndividualCompany"),
+        )
+
+    def _build_vehicle_request(self, data: Optional[Dict[str, Any]]) -> Optional[SDKBookingVehicleRequest]:
+        if not data:
+            return None
+
+        return SDKBookingVehicleRequest(
+            payment_type=_pick(data, "payment_type", "paymentType", "PaymentType"),
+            type=_pick(data, "type"),
+            payment_amount=_coerce_float(_pick(data, "payment_amount", "paymentAmount", "PaymentAmount")),
+            payment_transaction_type_code=_pick(
+                data,
+                "payment_transaction_type_code",
+                "paymentTransactionTypeCode",
+                "PaymentTransactionTypeCode",
+            ),
+            voucher_number=_pick(data, "voucher_number", "voucherNumber", "VoucherNumber"),
+        )
+
+    def _build_customer_update_request(self, data: Dict[str, Any]) -> WCCustomerUpdateRequest:
+        return WCCustomerUpdateRequest(
+            status=_pick(data, "status"),
+            first_name=_pick(data, "first_name", "firstName", "Name"),
+            middle_name=_pick(data, "middle_name", "middleName"),
+            last_name=_pick(data, "last_name", "lastName", "Surname"),
+            ragione_sociale=_pick(data, "ragione_sociale", "ragioneSociale"),
+            codice=_pick(data, "codice"),
+            street=_pick(data, "street"),
+            num=_pick(data, "num"),
+            city=_pick(data, "city"),
+            zip_code=_pick(data, "zip_code", "zip", "zipCode"),
+            country=_pick(data, "country"),
+            state=_pick(data, "state"),
+            ph_num1=_pick(data, "ph_num1", "phNum1"),
+            ph_num2=_pick(data, "ph_num2", "phNum2"),
+            mobile_number=_pick(data, "mobile_number", "mobileNumber"),
+            email=_pick(data, "email"),
+            vat_number=_pick(data, "vat_number", "vatNumber"),
+            birth_place=_pick(data, "birth_place", "birthPlace"),
+            birth_date=_pick(data, "birth_date", "birthDate"),
+            birth_province=_pick(data, "birth_province", "birthProvince"),
+            birth_nation=_pick(data, "birth_nation", "birthNation"),
+            gender=_coerce_bool(_pick(data, "gender")),
+            tax_code=_pick(data, "tax_code", "taxCode"),
+            document=_pick(data, "document"),
+            document_number=_pick(data, "document_number", "documentNumber"),
+            licence_type=_pick(data, "licence_type", "licenceType"),
+            issue_by=_pick(data, "issue_by", "issueBy"),
+            document2=_pick(data, "document2"),
+            document_number2=_pick(data, "document_number2", "documentNumber2"),
+            issue_by2=_pick(data, "issue_by2", "issueBy2"),
+            e_invoice_email=_pick(data, "e_invoice_email", "eInvoiceEmail"),
+            e_invoice_code=_pick(data, "e_invoice_code", "eInvoiceCode"),
+            release_date=_pick(data, "release_date", "releaseDate"),
+            expiry_date=_pick(data, "expiry_date", "expiryDate"),
+            release_date2=_pick(data, "release_date2", "releaseDate2"),
+            expiry_date2=_pick(data, "expiry_date2", "expiryDate2"),
+            is_physical_person=_coerce_bool(_pick(data, "is_physical_person", "isPhysicalPerson")),
+            is_individual_company=_coerce_bool(_pick(data, "is_individual_company", "isIndividualCompany")),
+        )
+
+    def _build_driver_request(self, reservation_id: Union[str, int], data: Dict[str, Any]) -> WCDriverCreateRequest:
+        return WCDriverCreateRequest(
+            reservation_id=reservation_id,
+            first_name=_pick(data, "first_name", "firstName", "Name"),
+            last_name=_pick(data, "last_name", "lastName", "Surname"),
+            middle_name=_pick(data, "middle_name", "middleName"),
+            ragione_sociale=_pick(data, "ragione_sociale", "ragioneSociale"),
+            codice=_pick(data, "codice"),
+            street=_pick(data, "street"),
+            num=_pick(data, "num"),
+            city=_pick(data, "city"),
+            zip_code=_pick(data, "zip_code", "zip", "zipCode"),
+            country=_pick(data, "country"),
+            state=_pick(data, "state"),
+            ph_num1=_pick(data, "ph_num1", "phNum1"),
+            ph_num2=_pick(data, "ph_num2", "phNum2"),
+            mobile_number=_pick(data, "mobile_number", "mobileNumber"),
+            email=_pick(data, "email"),
+            vat_number=_pick(data, "vat_number", "vatNumber"),
+            birth_place=_pick(data, "birth_place", "birthPlace"),
+            birth_date=_pick(data, "birth_date", "birthDate"),
+            birth_province=_pick(data, "birth_province", "birthProvince"),
+            birth_nation=_pick(data, "birth_nation", "birthNation"),
+            gender=_coerce_bool(_pick(data, "gender")),
+            tax_code=_pick(data, "tax_code", "taxCode"),
+            document=_pick(data, "document"),
+            document2=_pick(data, "document2"),
+            document_number=_pick(data, "document_number", "documentNumber"),
+            document_number2=_pick(data, "document_number2", "documentNumber2"),
+            licence_type=_pick(data, "licence_type", "licenceType"),
+            issue_by=_pick(data, "issue_by", "issueBy"),
+            issue_by2=_pick(data, "issue_by2", "issueBy2"),
+            release_date=_pick(data, "release_date", "releaseDate"),
+            release_date2=_pick(data, "release_date2", "releaseDate2"),
+            expiry_date=_pick(data, "expiry_date", "expiryDate"),
+            expiry_date2=_pick(data, "expiry_date2", "expiryDate2"),
+        )
+
     # ----------------------------- Public API: Locations -----------------------------
     def get_locations(self) -> List[Dict[str, Any]]:
-        """
-        Ritorna Locations convertite nel formato wrapper.
-        """
         self._ensure_authenticated()
         try:
             locs = self.client.get_locations()  # type: ignore[attr-defined]
         except AuthenticationError:
-            # retry una volta
             self.log.warning("MyRent locations: auth fallita, retry authenticate() ...")
             self.client.authenticate()  # type: ignore[attr-defined]
             locs = self.client.get_locations()  # type: ignore[attr-defined]
-
         return self.convert_locations(locs)
 
     def convert_locations(self, locs: List[Any]) -> List[Dict[str, Any]]:
@@ -369,24 +717,15 @@ class MyRentAdapter:
 
     # ----------------------------- Public API: Quotations -----------------------------
     def get_quotations(self, wrapper_req: Dict[str, Any]) -> Dict[str, Any]:
-        """
-        wrapper_req: dict con chiavi come la request del nostro endpoint /quotations.
-
-        Ritorna:
-          {"data": { ...QuotationData... }}  (formato wrapper)
-        """
         self._ensure_authenticated()
-
         sdk_req = self._build_sdk_quotation_request(wrapper_req)
 
         try:
             resp = self.client.get_quotations(sdk_req)  # type: ignore[attr-defined]
             raw = getattr(resp, "raw", None)
             if not isinstance(raw, dict):
-                # fallback: se lo SDK non espone .raw, usa direttamente l'oggetto
                 raw = self._obj_to_dict(resp)
         except AuthenticationError:
-            # retry una volta
             self.log.warning("MyRent quotations: auth fallita, retry authenticate() ...")
             self.client.authenticate()  # type: ignore[attr-defined]
             resp = self.client.get_quotations(sdk_req)  # type: ignore[attr-defined]
@@ -400,13 +739,6 @@ class MyRentAdapter:
         return {"data": converted_data}
 
     def _build_sdk_quotation_request(self, wrapper_req: Dict[str, Any]) -> Any:
-        """
-        Mappa la QuotationRequest della wrapper nei campi della QuotationRequest del SDK.
-
-        NOTE IMPORTANTI:
-        - Date: il SDK gestisce i secondi ma NON sempre la 'Z'; qui normalizziamo a 'YYYY-MM-DDTHH:MM:SS'
-        - channel: il SDK normalizza rimuovendo spazi
-        """
         pickup = str(wrapper_req.get("pickupLocation") or "")
         dropoff = str(wrapper_req.get("dropOffLocation") or "")
         if not pickup or not dropoff:
@@ -419,17 +751,14 @@ class MyRentAdapter:
 
         age_int = _coerce_int(wrapper_req.get("age")) or 0
 
-        # normalizziamo discount in stringa se presente (MyRent spesso lo vuole string)
         disc = wrapper_req.get("discountValueWithoutVat")
         disc_norm = None
         if disc is not None:
             disc_norm = str(disc)
 
-        # agreementCoupon: nel wrapper è stringa/None
         coupon = wrapper_req.get("agreementCoupon")
         coupon_norm = str(coupon).strip() if isinstance(coupon, str) and coupon.strip() else None
 
-        # booleans
         show_pics = _coerce_bool(wrapper_req.get("showPics"))
         show_opt_img = _coerce_bool(wrapper_req.get("showOptionalImage"))
         show_params = _coerce_bool(wrapper_req.get("showVehicleParameter"))
@@ -459,12 +788,8 @@ class MyRentAdapter:
         return sdk_req
 
     def convert_quotation_payload(self, payload: Dict[str, Any], wrapper_req: Dict[str, Any]) -> Dict[str, Any]:
-        """
-        Converte payload grezzo MyRent -> QuotationData wrapper.
-        """
         data_node = payload.get("data") if isinstance(payload, dict) else None
         if not isinstance(data_node, dict):
-            # alcuni ambienti usano "Data"
             data_node = payload.get("Data") if isinstance(payload, dict) else None
         if not isinstance(data_node, dict):
             data_node = {}
@@ -474,7 +799,6 @@ class MyRentAdapter:
         pickup_dt = data_node.get("PickUpDateTime") or wrapper_req.get("startDate") or ""
         return_dt = data_node.get("ReturnDateTime") or wrapper_req.get("endDate") or ""
 
-        # giorni: calcolo dal wrapper_req (preferibile) oppure dal payload
         start_dt = _parse_dt_any(wrapper_req.get("startDate")) or _parse_dt_any(pickup_dt)
         end_dt = _parse_dt_any(wrapper_req.get("endDate")) or _parse_dt_any(return_dt)
         days = 1
@@ -489,7 +813,7 @@ class MyRentAdapter:
                 continue
             vehicles_out.append(self._convert_vehicle_status(vs, wrapper_req, days, pickup_loc, dropoff_loc))
 
-        out: Dict[str, Any] = {
+        return {
             "total": len(vehicles_out),
             "PickUpLocation": str(pickup_loc),
             "ReturnLocation": str(dropoff_loc),
@@ -497,24 +821,839 @@ class MyRentAdapter:
             "ReturnDateTime": str(return_dt),
             "Vehicles": vehicles_out,
         }
+
+    def _build_probe_wrapper_req(
+        self,
+        *,
+        location: str,
+        start: datetime,
+        duration_days: int,
+        age: int,
+        channel: Optional[str],
+    ) -> Dict[str, Any]:
+        end = start + timedelta(days=max(1, int(duration_days)))
+        loc = str(location).strip().upper()
+
+        return {
+            "pickupLocation": loc,
+            "dropOffLocation": loc,
+            "startDate": _fmt_dt_no_tz_seconds(start),
+            "endDate": _fmt_dt_no_tz_seconds(end),
+            "age": int(age),
+            "channel": channel,
+            "showPics": False,
+            "showOptionalImage": False,
+            "showVehicleParameter": False,
+            "showVehicleExtraImage": False,
+            "agreementCoupon": None,
+            "discountValueWithoutVat": None,
+            "macroDescription": None,
+            "showBookingDiscount": False,
+            "isYoungDriverAge": None,
+            "isSeniorDriverAge": None,
+        }
+
+    # ----------------------------- Public API: Reservation compose -----------------------------
+    def create_reservation_flow(self, payload: Dict[str, Any]) -> Dict[str, Any]:
+        self._ensure_authenticated()
+        self._ensure_web_checkin_authenticated()
+
+        booking_data = payload.get("booking") or {}
+        customer_data = payload.get("customer") or {}
+        customer_update_data = payload.get("customerUpdate") or payload.get("customer_update") or {}
+        driver1_data = payload.get("driver1")
+        driver2_data = payload.get("driver2")
+        driver3_data = payload.get("driver3")
+
+        if not booking_data:
+            raise MyRentAdapterError("booking mancante")
+        if not customer_data:
+            raise MyRentAdapterError("customer mancante")
+
+        channel = self._normalize_channel(booking_data.get("channel"))
+
+        booking_req = SDKBookingRequest(
+            pickup_location=str(_pick(booking_data, "pickup_location", "pickupLocation")),
+            drop_off_location=str(_pick(booking_data, "drop_off_location", "dropOffLocation")),
+            start_date=_fmt_dt_no_tz_seconds(str(_pick(booking_data, "start_date", "startDate"))),
+            end_date=_fmt_dt_no_tz_seconds(str(_pick(booking_data, "end_date", "endDate"))),
+            vehicle_code=str(_pick(booking_data, "vehicle_code", "vehicleCode")),
+            channel=channel,
+            optionals=booking_data.get("optionals") or [],
+            young_driver_fee=_coerce_float(_pick(booking_data, "young_driver_fee", "youngDriverFee")),
+            senior_driver_fee=_coerce_float(_pick(booking_data, "senior_driver_fee", "seniorDriverFee")),
+            senior_driver_fee_desc=_pick(booking_data, "senior_driver_fee_desc", "seniorDriverFeeDesc"),
+            young_driver_fee_desc=_pick(booking_data, "young_driver_fee_desc", "youngDriverFeeDesc"),
+            online_user=_coerce_int(_pick(booking_data, "online_user", "onlineUser")),
+            insurance_id=_coerce_int(_pick(booking_data, "insurance_id", "insuranceId")),
+            agreement_coupon=_pick(booking_data, "agreement_coupon", "agreementCoupon"),
+            transaction_status_code=_pick(booking_data, "transaction_status_code", "TransactionStatusCode"),
+            pay_now_dis=_pick(booking_data, "pay_now_dis", "PayNowDis"),
+            is_young_driver_age=_coerce_bool(_pick(booking_data, "is_young_driver_age", "isYoungDriverAge")),
+            is_senior_driver_age=_coerce_bool(_pick(booking_data, "is_senior_driver_age", "isSeniorDriverAge")),
+            customer=self._build_booking_customer(customer_data),
+            vehicle_request=self._build_vehicle_request(booking_data.get("vehicleRequest") or booking_data.get("vehicle_request")),
+        )
+
+        try:
+            booking_resp = self.client.create_booking(booking_req)
+        except APIError as e:
+            raise MyRentAdapterError(f"Create booking fallita: {e}") from e
+
+        if not booking_resp.data or not booking_resp.data[0].id:
+            raise MyRentAdapterError("Create booking riuscita senza booking id in risposta")
+
+        booking_row = booking_resp.data[0]
+        booking_id = str(booking_row.id)
+
+        try:
+            booking_detail_resp = self.client.get_booking(booking_id, channel=channel)
+        except APIError as e:
+            raise MyRentAdapterError(f"Get booking detail fallita dopo create_booking: {e}") from e
+
+        if not booking_detail_resp.data:
+            raise MyRentAdapterError("Get booking detail non ha restituito dati")
+
+        booking_detail = booking_detail_resp.data[0]
+
+        if hasattr(booking_detail, "to_dict") and callable(getattr(booking_detail, "to_dict")):
+            booking_detail_dict = booking_detail.to_dict()
+        else:
+            booking_detail_dict = self._obj_to_dict(booking_detail)
+
+        reservation_id_internal = (
+            getattr(booking_detail, "db_id", None)
+            or booking_detail_dict.get("db_id")
+            or booking_detail_dict.get("dbId")
+        )
+        customer_id = (
+            getattr(booking_detail, "customer_id", None)
+            or booking_detail_dict.get("customer_id")
+            or booking_detail_dict.get("customerId")
+        )
+
+        if not reservation_id_internal:
+            raise MyRentAdapterError("Impossibile estrarre dbId / reservation id interno dal booking detail")
+
+        lookup_info = self._parse_booking_lookup_fields(
+            booking_id=booking_id,
+            booking_detail_dict=booking_detail_dict,
+            booking_data=booking_data,
+        )
+
+        self._index_reservation(
+            reservation_id=reservation_id_internal,
+            booking_id=booking_id,
+            channel=channel,
+            customer_id=customer_id,
+            extra=lookup_info,
+        )
+
+        customer_before = None
+        if customer_id:
+            try:
+                customer_before_obj = self.web_checkin_client.get_customer(customer_id).ensure_success()
+                customer_before = self._customer_profile_to_dict(customer_before_obj)
+            except Exception as e:
+                self.log.warning("Get customer post-booking fallita: %s", e)
+
+        customer_after = customer_before
+
+        merged_customer_update_data: Dict[str, Any] = {}
+        if customer_data:
+            merged_customer_update_data.update(customer_data)
+        if customer_update_data:
+            merged_customer_update_data.update(customer_update_data)
+
+        if merged_customer_update_data and customer_id:
+            try:
+                update_req = self._build_customer_update_request(merged_customer_update_data)
+                updated_customer_obj = self.web_checkin_client.update_customer(customer_id, update_req).ensure_success()
+                customer_after = self._customer_profile_to_dict(updated_customer_obj)
+            except (WCAPIError, WCAuthenticationError, Exception) as e:
+                raise MyRentAdapterError(f"Update customer fallita: {e}") from e
+
+        has_any_driver = any([driver1_data, driver2_data, driver3_data])
+
+        driver1_result = None
+        driver2_result = None
+        driver3_result = None
+        customer_as_driver1_result = None
+
+        if (driver2_data or driver3_data) and not driver1_data:
+            raise MyRentAdapterError("driver2/driver3 forniti senza driver1: caso non supportato in modo implicito")
+
+        if not has_any_driver:
+            try:
+                customer_as_driver1_result = self.web_checkin_client.set_customer_as_driver1(
+                    reservation_id_internal
+                ).ensure_success().to_dict()
+            except (WCAPIError, WCAuthenticationError, Exception) as e:
+                raise MyRentAdapterError(f"set_customer_as_driver1 fallita: {e}") from e
+        else:
+            if driver1_data:
+                try:
+                    req1 = self._build_driver_request(reservation_id_internal, driver1_data)
+                    driver1_result = self.web_checkin_client.insert_new_driver1(req1).ensure_success().to_dict()
+                except (WCAPIError, WCAuthenticationError, Exception) as e:
+                    raise MyRentAdapterError(f"insert_new_driver1 fallita: {e}") from e
+
+            if driver2_data:
+                try:
+                    req2 = self._build_driver_request(reservation_id_internal, driver2_data)
+                    driver2_result = self.web_checkin_client.insert_new_driver2(req2).ensure_success().to_dict()
+                except (WCAPIError, WCAuthenticationError, Exception) as e:
+                    raise MyRentAdapterError(f"insert_new_driver2 fallita: {e}") from e
+
+            if driver3_data:
+                try:
+                    req3 = self._build_driver_request(reservation_id_internal, driver3_data)
+                    driver3_result = self.web_checkin_client.insert_new_driver3(req3).ensure_success().to_dict()
+                except (WCAPIError, WCAuthenticationError, Exception) as e:
+                    raise MyRentAdapterError(f"insert_new_driver3 fallita: {e}") from e
+
+        self._index_reservation(
+            reservation_id=reservation_id_internal,
+            booking_id=booking_id,
+            channel=channel,
+            customer_id=customer_id,
+            extra={
+                **lookup_info,
+                "used_customer_as_driver1": customer_as_driver1_result is not None,
+                "set_customer_as_driver1_result": customer_as_driver1_result,
+                "driver1_result": driver1_result,
+                "driver2_result": driver2_result,
+                "driver3_result": driver3_result,
+                "customer_before_update": customer_before,
+                "customer_after_update": customer_after,
+            },
+        )
+
+        booking_create_dict = (
+            booking_resp.to_dict()
+            if hasattr(booking_resp, "to_dict") and callable(getattr(booking_resp, "to_dict"))
+            else self._obj_to_dict(booking_resp)
+        )
+
+        return {
+            "booking_id": booking_id,
+            "reservation_id_internal": reservation_id_internal,
+            "customer_id": customer_id,
+            "channel": channel,
+            "booking_create": booking_create_dict,
+            "booking_detail": booking_detail_dict,
+            "customer_before_update": customer_before,
+            "customer_after_update": customer_after,
+            "used_customer_as_driver1": customer_as_driver1_result is not None,
+            "set_customer_as_driver1_result": customer_as_driver1_result,
+            "driver1_result": driver1_result,
+            "driver2_result": driver2_result,
+            "driver3_result": driver3_result,
+        }
+
+    def _normalize_email(self, value: Optional[str]) -> Optional[str]:
+        if value is None:
+            return None
+        s = str(value).strip().lower()
+        return s or None
+
+    def _emails_match(self, a: Optional[str], b: Optional[str]) -> bool:
+        return self._normalize_email(a) == self._normalize_email(b)
+
+    def _search_webcheckin_reservation_by_code(
+            self,
+            *,
+            reservation_code: str,
+            reservation_date: str,
+    ):
+        self._ensure_web_checkin_authenticated()
+
+        parsed = self._parse_external_reservation_code(reservation_code)
+
+        attempts = [
+            WCReservationLookupRequest(
+                reservation_number=str(parsed["reservation_number"]),
+                reservation_prefix=str(parsed["reservation_prefix"]),
+                reservation_date=str(reservation_date),
+                confirmation_code=parsed["confirmation_code"],
+            )
+        ]
+
+        # fallback: alcuni ambienti potrebbero voler number + confirmation nello stesso campo
+        if parsed["confirmation_code"]:
+            attempts.append(
+                WCReservationLookupRequest(
+                    reservation_number=f'{parsed["reservation_number"]} {parsed["confirmation_code"]}',
+                    reservation_prefix=str(parsed["reservation_prefix"]),
+                    reservation_date=str(reservation_date),
+                    confirmation_code=None,
+                )
+            )
+
+        last_error = None
+        for req in attempts:
+            try:
+                return self.web_checkin_client.search_reservation(req).ensure_success()
+            except Exception as e:
+                last_error = e
+
+        raise MyRentAdapterError(
+            f"Nessuna reservation trovata via web-checkin per code='{reservation_code}' "
+            f"e reservation_date='{reservation_date}'. Last error: {last_error}"
+        )
+
+    def _parse_external_reservation_code(self, reservation_code: str) -> Dict[str, Optional[str]]:
+        raw = re.sub(r"\s+", " ", (reservation_code or "").strip())
+        if not raw:
+            raise MyRentAdapterError("reservation_code vuoto")
+
+        m = re.match(
+            r"^(?P<prefix>[A-Za-z]+)\s+(?P<number>\d+)(?:\s+(?P<confirmation>.+))?$",
+            raw
+        )
+        if not m:
+            raise MyRentAdapterError(
+                f"Formato reservation_code non valido: '{reservation_code}'. "
+                "Atteso ad es. 'SUL 123' oppure 'SUL 123 TESTDOGMA'"
+            )
+
+        return {
+            "reservation_prefix": m.group("prefix").strip(),
+            "reservation_number": m.group("number").strip(),
+            "confirmation_code": (m.group("confirmation") or "").strip() or None,
+            "raw_code": raw,
+        }
+
+    def _build_reservation_full_details(
+            self,
+            *,
+            booking_id: str,
+            channel: str,
+            customer_id: Optional[Union[str, int]],
+            reservation_web_checkin: Optional[Dict[str, Any]] = None,
+            persisted_meta: Optional[Dict[str, Any]] = None,
+            reservation_id_internal_hint: Optional[Union[str, int]] = None,
+    ) -> Dict[str, Any]:
+        """
+        Costruisce il payload finale dei reservation details partendo da:
+        - booking_id
+        - channel
+        - customer_id opzionale
+        - eventuale reservation_web_checkin già risolta a monte
+        - eventuali metadati persistiti (driver results, flags, prefix/number/date/voucher)
+        - eventuale reservation_id interno già noto
+        """
+        booking_id = str(booking_id or "").strip()
+        if not booking_id:
+            raise MyRentAdapterError("booking_id vuoto")
+
+        channel = self._normalize_channel(channel)
+        meta: Dict[str, Any] = dict(persisted_meta or {})
+
+        # ------------------------------------------------------------------
+        # 1) booking detail
+        # ------------------------------------------------------------------
+        self._ensure_authenticated()
+        try:
+            booking_detail_resp = self.client.get_booking(booking_id, channel=channel)
+        except AuthenticationError:
+            self.log.warning(
+                "MyRent reservation details: auth fallita su get_booking, retry authenticate() ..."
+            )
+            self.client.authenticate()
+            booking_detail_resp = self.client.get_booking(booking_id, channel=channel)
+        except APIError as e:
+            raise MyRentAdapterError(
+                f"Get booking detail fallita per booking_id '{booking_id}': {e}"
+            ) from e
+
+        if not booking_detail_resp.data:
+            raise MyRentAdapterError(
+                f"Get booking detail non ha restituito dati per booking_id '{booking_id}'"
+            )
+
+        booking_detail = booking_detail_resp.data[0]
+
+        if hasattr(booking_detail, "to_dict") and callable(getattr(booking_detail, "to_dict")):
+            booking_detail_dict = booking_detail.to_dict()
+        else:
+            booking_detail_dict = self._obj_to_dict(booking_detail)
+
+        if not isinstance(booking_detail_dict, dict) or not booking_detail_dict:
+            raise MyRentAdapterError(
+                f"Impossibile serializzare booking detail per booking_id '{booking_id}'"
+            )
+
+        fresh_customer_id = (
+                booking_detail_dict.get("customerId")
+                or booking_detail_dict.get("customer_id")
+                or getattr(booking_detail, "customer_id", None)
+                or customer_id
+        )
+
+        fresh_reservation_id = (
+                booking_detail_dict.get("dbId")
+                or booking_detail_dict.get("db_id")
+                or getattr(booking_detail, "db_id", None)
+                or reservation_id_internal_hint
+        )
+
+        # ------------------------------------------------------------------
+        # 2) customer detail
+        # ------------------------------------------------------------------
+        customer_payload = None
+        if fresh_customer_id:
+            self._ensure_web_checkin_authenticated()
+            try:
+                customer_obj = self.web_checkin_client.get_customer(fresh_customer_id).ensure_success()
+                customer_payload = self._customer_profile_to_dict(customer_obj)
+            except WCAuthenticationError:
+                self.log.warning(
+                    "MyRent reservation details: auth fallita su get_customer, retry authenticate_for_web_checkin() ..."
+                )
+                self.web_checkin_client.authenticate_for_web_checkin()
+                customer_obj = self.web_checkin_client.get_customer(fresh_customer_id).ensure_success()
+                customer_payload = self._customer_profile_to_dict(customer_obj)
+            except WCAPIError as e:
+                raise MyRentAdapterError(
+                    f"Get customer fallita per customer_id '{fresh_customer_id}': {e}"
+                ) from e
+            except Exception as e:
+                raise MyRentAdapterError(
+                    f"Get customer fallita per customer_id '{fresh_customer_id}': {e}"
+                ) from e
+
+        # ------------------------------------------------------------------
+        # 3) lookup info utili per search_reservation / indicizzazione
+        # ------------------------------------------------------------------
+        reservation_prefix = meta.get("reservation_prefix")
+        reservation_number = meta.get("reservation_number")
+        reservation_date = meta.get("reservation_date")
+        reservation_voucher = meta.get("reservation_voucher")
+
+        recomputed_lookup = self._parse_booking_lookup_fields(
+            booking_id=booking_id,
+            booking_detail_dict=booking_detail_dict,
+            booking_data=None,
+        )
+
+        reservation_prefix = reservation_prefix or recomputed_lookup.get("reservation_prefix")
+        reservation_number = reservation_number or recomputed_lookup.get("reservation_number")
+        reservation_date = reservation_date or recomputed_lookup.get("reservation_date")
+        reservation_voucher = reservation_voucher or recomputed_lookup.get("reservation_voucher")
+
+        # Se reservation_web_checkin è già stato passato, uso anche quello per arricchire i campi
+        if reservation_web_checkin:
+            reservation_voucher = reservation_voucher or reservation_web_checkin.get("voucher")
+            if not reservation_date:
+                reservation_date = self._extract_date_only_iso(
+                    reservation_web_checkin.get("pick_up_date")
+                    or reservation_web_checkin.get("pickUpDate")
+                )
+
+        # ------------------------------------------------------------------
+        # 4) reservation live via web-checkin, se non già fornita
+        # ------------------------------------------------------------------
+        if reservation_web_checkin is None:
+            self._ensure_web_checkin_authenticated()
+
+            if reservation_prefix and reservation_number and reservation_date:
+                try:
+                    res_obj = self.web_checkin_client.search_reservation(
+                        WCReservationLookupRequest(
+                            reservation_number=str(reservation_number),
+                            reservation_prefix=str(reservation_prefix),
+                            reservation_date=str(reservation_date),
+                        )
+                    ).ensure_success()
+                    reservation_web_checkin = res_obj.to_dict()
+                except Exception as e:
+                    self.log.warning(
+                        "search_reservation fallita per booking_id=%s prefix=%s number=%s date=%s: %s",
+                        booking_id,
+                        reservation_prefix,
+                        reservation_number,
+                        reservation_date,
+                        e,
+                    )
+
+            if reservation_web_checkin is None and reservation_voucher:
+                try:
+                    voucher_resp = self.web_checkin_client.search_reservations_by_voucher(
+                        WCReservationVoucherSearchRequest(
+                            reservation_voucher=str(reservation_voucher),
+                        )
+                    ).ensure_success()
+
+                    matched = None
+                    for item in voucher_resp.reservations:
+                        if str(item.reservation_id or "") == str(fresh_reservation_id or ""):
+                            matched = item
+                            break
+                        if str(item.num_pref_code or "").strip() == booking_id:
+                            matched = item
+                            break
+
+                    if matched is None and voucher_resp.reservations:
+                        matched = voucher_resp.reservations[0]
+
+                    if matched is not None:
+                        reservation_web_checkin = matched.to_dict()
+                except Exception as e:
+                    self.log.warning(
+                        "search_reservations_by_voucher fallita per booking_id=%s voucher=%s: %s",
+                        booking_id,
+                        reservation_voucher,
+                        e,
+                    )
+
+        # ------------------------------------------------------------------
+        # 5) riallinea indice locale, se possibile
+        # ------------------------------------------------------------------
+        if fresh_reservation_id:
+            try:
+                self._index_reservation(
+                    reservation_id=fresh_reservation_id,
+                    booking_id=booking_id,
+                    channel=channel,
+                    customer_id=fresh_customer_id,
+                    extra={
+                        "reservation_prefix": reservation_prefix,
+                        "reservation_number": reservation_number,
+                        "reservation_date": reservation_date,
+                        "reservation_voucher": reservation_voucher,
+                        "used_customer_as_driver1": meta.get("used_customer_as_driver1"),
+                        "set_customer_as_driver1_result": meta.get("set_customer_as_driver1_result"),
+                        "driver1_result": meta.get("driver1_result"),
+                        "driver2_result": meta.get("driver2_result"),
+                        "driver3_result": meta.get("driver3_result"),
+                        "customer_before_update": meta.get("customer_before_update"),
+                        "customer_after_update": meta.get("customer_after_update"),
+                    },
+                )
+            except Exception as e:
+                self.log.warning(
+                    "Indicizzazione reservation fallita per reservation_id=%s booking_id=%s: %s",
+                    fresh_reservation_id,
+                    booking_id,
+                    e,
+                )
+
+        # ------------------------------------------------------------------
+        # 6) payload finale
+        # ------------------------------------------------------------------
+        return {
+            "reservation_id_internal": fresh_reservation_id,
+            "booking_id": booking_id,
+            "channel": channel,
+            "customer_id": fresh_customer_id,
+            "booking_detail": booking_detail_dict,
+            "customer": customer_payload,
+
+            # risultati compose persistiti dalla wrapper
+            "used_customer_as_driver1": meta.get("used_customer_as_driver1"),
+            "set_customer_as_driver1_result": meta.get("set_customer_as_driver1_result"),
+            "driver1_result": meta.get("driver1_result"),
+            "driver2_result": meta.get("driver2_result"),
+            "driver3_result": meta.get("driver3_result"),
+
+            # dettaglio live da web-checkin
+            "reservation_web_checkin": reservation_web_checkin,
+
+            # campi comodi
+            "customer_first_name": None if reservation_web_checkin is None else reservation_web_checkin.get(
+                "customer_first_name"),
+            "customer_last_name": None if reservation_web_checkin is None else reservation_web_checkin.get(
+                "customer_last_name"),
+            "driver1": None if reservation_web_checkin is None else reservation_web_checkin.get("driver1"),
+            "driver1_id": None if reservation_web_checkin is None else reservation_web_checkin.get("driver1_id"),
+            "driver2": None if reservation_web_checkin is None else reservation_web_checkin.get("driver2"),
+            "driver2_id": None if reservation_web_checkin is None else reservation_web_checkin.get("driver2_id"),
+            "driver3": None if reservation_web_checkin is None else reservation_web_checkin.get("driver3"),
+            "driver3_id": None if reservation_web_checkin is None else reservation_web_checkin.get("driver3_id"),
+        }
+
+    # ----------------------------- Public API: Reservation details -----------------------------
+    def get_reservation_full_details(self, reservation_id: Union[str, int]) -> Dict[str, Any]:
+        """
+        Recupera i dettagli completi di una reservation a partire dal reservation_id interno
+        usando l'indice persistito/in-memory, poi delega la costruzione del payload
+        finale a _build_reservation_full_details(...).
+        """
+        rid = str(reservation_id).strip()
+        if not rid:
+            raise MyRentAdapterError("reservation_id vuoto")
+
+        indexed = self._get_indexed_reservation(rid)
+        if not indexed:
+            raise MyRentAdapterError(
+                f"reservation_id interno '{rid}' non trovato nell'indice persistito/in-memory. "
+                "La reservation deve essere stata creata da questa wrapper oppure il file indice non deve essere stato perso."
+            )
+
+        booking_id = str(indexed.get("booking_id") or "").strip()
+        channel = self._normalize_channel(indexed.get("channel"))
+        customer_id = indexed.get("customer_id")
+
+        if not booking_id:
+            raise MyRentAdapterError(
+                f"Indice corrotto/incompleto per reservation_id '{rid}': booking_id mancante"
+            )
+
+        return self._build_reservation_full_details(
+            booking_id=booking_id,
+            channel=channel,
+            customer_id=customer_id,
+            reservation_web_checkin=None,
+            persisted_meta=indexed,
+            reservation_id_internal_hint=rid,
+        )
+
+    def _normalize_channel_from_source_code(self, value: Optional[str]) -> Optional[str]:
+        """
+        Converte un reservation_source_code del web-checkin nel formato channel
+        atteso dal booking SDK.
+
+        Esempio:
+            "RENTAL PREMIUM POA" -> "RENTAL_PREMIUM_POA"
+        """
+        if value is None:
+            return None
+
+        s = re.sub(r"\s+", " ", str(value).strip())
+        if not s:
+            return None
+
+        return s.replace(" ", "_")
+
+    def _candidate_channels_for_by_code(
+        self,
+        *,
+        persisted_meta: Optional[Dict[str, Any]],
+        reservation_web_checkin: Optional[Dict[str, Any]],
+    ) -> List[str]:
+        """
+        Costruisce la lista dei channel candidati da usare per get_booking(...)
+        nel flusso by-code.
+
+        Priorità:
+        1) channel persistito nell'indice locale
+        2) reservation_source_code del web-checkin convertito in formato channel
+        3) company_code del client come fallback finale
+        """
+        raw_candidates: List[str] = []
+
+        if isinstance(persisted_meta, dict):
+            persisted_channel = persisted_meta.get("channel")
+            if isinstance(persisted_channel, str) and persisted_channel.strip():
+                raw_candidates.append(persisted_channel.strip())
+
+        if isinstance(reservation_web_checkin, dict):
+            source_code = reservation_web_checkin.get("reservation_source_code")
+            normalized_from_source = self._normalize_channel_from_source_code(source_code)
+            if normalized_from_source:
+                raw_candidates.append(normalized_from_source)
+
+        company_code = getattr(self.client, "company_code", None)
+        if isinstance(company_code, str) and company_code.strip():
+            raw_candidates.append(company_code.strip())
+
+        out: List[str] = []
+        seen = set()
+
+        for candidate in raw_candidates:
+            try:
+                normalized = self._normalize_channel(candidate)
+            except Exception:
+                continue
+
+            key = normalized.upper()
+            if key in seen:
+                continue
+
+            seen.add(key)
+            out.append(normalized)
+
         return out
+
+    def _booking_detail_is_complete(self, payload: Optional[Dict[str, Any]]) -> bool:
+        """
+        Verifica che il booking_detail ritornato sia davvero valido e non un payload
+        parziale/errore mascherato.
+        """
+        if not isinstance(payload, dict):
+            return False
+
+        booking_detail = payload.get("booking_detail")
+        if not isinstance(booking_detail, dict):
+            return False
+
+        # caso buono
+        if booking_detail.get("id") and booking_detail.get("vehicle_code"):
+            return True
+
+        # caso errore mascherato in raw
+        raw = booking_detail.get("raw")
+        if isinstance(raw, dict) and raw.get("errors"):
+            return False
+
+        return False
+
+    def get_reservation_full_details_by_code_and_email(
+            self,
+            *,
+            reservation_code: str,
+            customer_email: str,
+            reservation_date: str,
+    ) -> Dict[str, Any]:
+        """
+        Recupera i dettagli completi di una reservation partendo da:
+        - reservation_code esterno (es. 'SUL 123' oppure 'SUL 123 TESTDOGMA')
+        - email del customer
+        - reservation_date (reservation date o pick-up date, formato yyyy-MM-dd)
+
+        Flusso:
+        1) lookup live via /api/v2/data/reservation
+        2) get_customer(customer_id)
+        3) verifica email
+        4) risoluzione channel corretto
+        5) get_booking(numPrefCode, channel) con retry sui channel candidati
+        6) costruzione payload finale via _build_reservation_full_details(...)
+        """
+        if not reservation_code or not str(reservation_code).strip():
+            raise MyRentAdapterError("reservation_code vuoto")
+
+        if not customer_email or not str(customer_email).strip():
+            raise MyRentAdapterError("customer_email vuota")
+
+        if not reservation_date or not str(reservation_date).strip():
+            raise MyRentAdapterError("reservation_date vuota")
+
+        # 1) lookup live via web-checkin
+        reservation_rec = self._search_webcheckin_reservation_by_code(
+            reservation_code=reservation_code,
+            reservation_date=reservation_date,
+        )
+
+        reservation_web_checkin = reservation_rec.to_dict()
+
+        booking_id = reservation_rec.num_pref_code
+        if not booking_id:
+            raise MyRentAdapterError(
+                "La reservation trovata non contiene numPrefCode, impossibile richiedere il booking detail"
+            )
+
+        customer_id = reservation_rec.customer_id
+        if not customer_id:
+            raise MyRentAdapterError(
+                "La reservation trovata non contiene customerId, impossibile validare la mail"
+            )
+
+        # 2) lettura customer e verifica email
+        self._ensure_web_checkin_authenticated()
+        try:
+            customer_obj = self.web_checkin_client.get_customer(customer_id).ensure_success()
+        except WCAuthenticationError:
+            self.web_checkin_client.authenticate_for_web_checkin()
+            customer_obj = self.web_checkin_client.get_customer(customer_id).ensure_success()
+        except Exception as e:
+            raise MyRentAdapterError(
+                f"Get customer fallita durante validazione email per customer_id '{customer_id}': {e}"
+            ) from e
+
+        if not self._emails_match(customer_obj.email, customer_email):
+            # risposta neutra per evitare enumeration
+            raise MyRentAdapterError("Reservation non trovata")
+
+        # 3) prova a recuperare eventuali metadati già persistiti
+        persisted_meta: Dict[str, Any] = {}
+        if reservation_rec.reservation_id is not None:
+            indexed = self._get_indexed_reservation(reservation_rec.reservation_id)
+            if isinstance(indexed, dict):
+                persisted_meta = dict(indexed)
+
+        # se non c'è nulla nell'indice, almeno salvo lookup base
+        if not persisted_meta:
+            parsed_code = self._parse_external_reservation_code(reservation_code)
+            persisted_meta = {
+                "reservation_prefix": parsed_code.get("reservation_prefix"),
+                "reservation_number": parsed_code.get("reservation_number"),
+                "reservation_date": reservation_date,
+                "reservation_voucher": reservation_rec.voucher,
+            }
+
+        # 4) costruisci i channel candidati
+        candidate_channels = self._candidate_channels_for_by_code(
+            persisted_meta=persisted_meta,
+            reservation_web_checkin=reservation_web_checkin,
+        )
+
+        if not candidate_channels:
+            raise MyRentAdapterError(
+                f"Impossibile determinare il channel corretto per booking_id '{booking_id}'"
+            )
+
+        self.log.info(
+            "By-code lookup booking_id=%s, channel candidati=%s",
+            booking_id,
+            candidate_channels,
+        )
+
+        # 5) prova i channel candidati finché non ottieni un booking detail valido
+        last_payload: Optional[Dict[str, Any]] = None
+        last_error: Optional[Exception] = None
+
+        for channel in candidate_channels:
+            try:
+                payload = self._build_reservation_full_details(
+                    booking_id=str(booking_id),
+                    channel=channel,
+                    customer_id=customer_id,
+                    reservation_web_checkin=reservation_web_checkin,
+                    persisted_meta=persisted_meta,
+                    reservation_id_internal_hint=reservation_rec.reservation_id,
+                )
+
+                if self._booking_detail_is_complete(payload):
+                    return payload
+
+                last_payload = payload
+                self.log.warning(
+                    "By-code lookup: booking detail incompleto per booking_id=%s con channel=%s",
+                    booking_id,
+                    channel,
+                )
+
+            except Exception as e:
+                last_error = e
+                self.log.warning(
+                    "By-code lookup: tentativo fallito per booking_id=%s con channel=%s: %s",
+                    booking_id,
+                    channel,
+                    e,
+                )
+
+        # 6) nessun channel ha funzionato: errore esplicito
+        if last_payload is not None:
+            booking_detail = last_payload.get("booking_detail") if isinstance(last_payload, dict) else {}
+            raw = booking_detail.get("raw") if isinstance(booking_detail, dict) else None
+            raise MyRentAdapterError(
+                f"Booking detail non recuperabile per booking_id '{booking_id}'. "
+                f"Canali tentati: {candidate_channels}. "
+                f"Ultima risposta raw: {raw}"
+            )
+
+        raise MyRentAdapterError(
+            f"Booking detail non recuperabile per booking_id '{booking_id}'. "
+            f"Canali tentati: {candidate_channels}. "
+            f"Ultimo errore: {last_error}"
+        )
 
     # ----------------------------- Internals: conversions -----------------------------
     def _normalize_transmission(self, v: Any) -> Optional[str]:
-        """
-        Normalizza il campo trasmissione in una stringa compatibile col wrapper:
-        - "M" per manuale
-        - "A" per automatico
-
-        MyRent può restituire:
-          - stringhe ("M", "A", "MANUALE", "AUTOMATICO", ...)
-          - dict (es. {"id": 2, "description": "MANUALE"})
-          - int (es. 1/2) in alcuni ambienti
-        """
         if v is None:
             return None
 
-        # già stringa
         if isinstance(v, str):
             s = v.strip()
             if not s:
@@ -524,32 +1663,25 @@ class MyRentAdapter:
                 return "M"
             if su in {"A", "AUT", "AUTO", "AUTOMATICO", "AUTOMATIC"}:
                 return "A"
-            # euristica
             if "MAN" in su:
                 return "M"
             if "AUT" in su or "AUTO" in su:
                 return "A"
-            # fallback: accetta la stringa così com'è (meglio di un dict)
             return s
 
-        # dict tipo {"id": 2, "description": "MANUALE"}
         if isinstance(v, dict):
             desc = v.get("description") or v.get("Description") or v.get("name") or v.get("Name")
             code = v.get("code") or v.get("Code")
             vid = v.get("id") or v.get("ID")
 
-            # prova description
             if isinstance(desc, str) and desc.strip():
                 return self._normalize_transmission(desc)
 
-            # prova code
             if isinstance(code, str) and code.strip():
                 return self._normalize_transmission(code)
 
-            # prova id numerico
             vid_int = _coerce_int(vid)
             if vid_int is not None:
-                # euristica comune: 1=manuale, 2=automatico (se diverso, la description sopra avrebbe già funzionato)
                 if vid_int == 1:
                     return "M"
                 if vid_int == 2:
@@ -558,7 +1690,6 @@ class MyRentAdapter:
 
             return None
 
-        # numeri
         if isinstance(v, (int, float)) and not isinstance(v, bool):
             vi = _coerce_int(v)
             if vi == 1:
@@ -567,7 +1698,6 @@ class MyRentAdapter:
                 return "A"
             return str(v)
 
-        # fallback robusto: evita di ritornare dict/oggetti
         try:
             s = str(v).strip()
             return s or None
@@ -587,7 +1717,6 @@ class MyRentAdapter:
 
         veh_raw = vs.get("Vehicle") if isinstance(vs.get("Vehicle"), dict) else {}
 
-        # groupPic (MyRent la mette spesso dentro Vehicle)
         if isinstance(veh_raw.get("groupPic"), dict):
             group_pic_raw = veh_raw.get("groupPic")
         elif isinstance(vs.get("groupPic"), dict):
@@ -598,7 +1727,6 @@ class MyRentAdapter:
         code = veh_raw.get("Code") or group_pic_raw.get("internationalCode") or ""
         code_context = veh_raw.get("CodeContext") or "ACRISS"
 
-        # VehMakeModel: MyRent -> dict, wrapper -> lista
         make_model_name = self._extract_make_model_name(veh_raw) or str(code)
 
         national_code = (
@@ -608,7 +1736,6 @@ class MyRentAdapter:
             or None
         )
 
-        # id: preferisci groupPic.id (se presente), fallback a Code
         vid = group_pic_raw.get("id")
         if vid is None:
             vid = veh_raw.get("id")
@@ -626,14 +1753,12 @@ class MyRentAdapter:
 
         fuel = veh_raw.get("fuel") or veh_raw.get("fuelType")
 
-        # ✅ FIX: normalizzazione transmission (evita dict -> errore Pydantic)
         transmission_norm = self._normalize_transmission(
             veh_raw.get("transmission") or veh_raw.get("Transmission")
         )
 
         locations = _unique([pickup_loc, dropoff_loc])
 
-        # TotalCharge: normalizza in (pre_vat, total_vat_incl)
         tc_raw = vs.get("TotalCharge") if isinstance(vs.get("TotalCharge"), dict) else {}
         pre_vat, total = self._normalize_total_charge(tc_raw)
 
@@ -650,7 +1775,6 @@ class MyRentAdapter:
             "myrent": ref_raw,
         }
 
-        # vehicleParameter: prendi da Vehicle.vehicleParameter o VehicleStatus.vehicleParameter
         vparams_out = None
         if _coerce_bool(wrapper_req.get("showVehicleParameter")):
             if isinstance(vs.get("vehicleParameter"), list):
@@ -678,17 +1802,14 @@ class MyRentAdapter:
                     }
                 )
 
-        # groupPic wrapper: solo se showPics=true
         group_pic_out = None
         if _coerce_bool(wrapper_req.get("showPics")):
             gid = _coerce_int(group_pic_raw.get("id"))
             if gid is not None:
                 group_pic_out = {"id": int(gid), "url": None}
 
-        # vehicleExtraImage wrapper
         vehicle_extra_image = [] if _coerce_bool(wrapper_req.get("showVehicleExtraImage")) else None
 
-        # optionals: MyRent li mette in vs.optionals
         optionals_out: List[Dict[str, Any]] = []
         show_opt_img = bool(_coerce_bool(wrapper_req.get("showOptionalImage")))
         opt_list = vs.get("optionals") if isinstance(vs.get("optionals"), list) else []
@@ -722,7 +1843,6 @@ class MyRentAdapter:
                 }
             )
 
-        # BookingVehicle wrapper (schema nostro)
         vehicle_out: Dict[str, Any] = {
             "id": vid,
             "Code": str(code),
@@ -736,7 +1856,7 @@ class MyRentAdapter:
             "VendorCarType": veh_raw.get("VendorCarType"),
             "seats": seats,
             "doors": _coerce_int(veh_raw.get("doors")) or None,
-            "transmission": transmission_norm,  # ✅ FIX QUI
+            "transmission": transmission_norm,
             "fuel": fuel,
             "aircon": aircon,
             "imageUrl": (veh_raw.get("vehicleGroupPic") or None) or None,
@@ -749,7 +1869,7 @@ class MyRentAdapter:
             "plates": [],
         }
 
-        vehicle_status_out: Dict[str, Any] = {
+        return {
             "Status": status,
             "Reference": reference_out,
             "Vehicle": vehicle_out,
@@ -762,36 +1882,22 @@ class MyRentAdapter:
                 "RateTotalAmount": round(pre_vat, 2),
             },
         }
-        return vehicle_status_out
 
     def _normalize_total_charge(self, tc_raw: Dict[str, Any]) -> Tuple[float, float]:
-        """
-        MyRent può restituire:
-          - RateTotalAmount
-          - EstimatedTotalAmount (talvolta 0)
-          - TaxableAmount (spesso pre-IVA)
-        Noi vogliamo:
-          - pre_vat
-          - total (iva inclusa)
-        """
         est = _coerce_float(tc_raw.get("EstimatedTotalAmount"))
         rate = _coerce_float(tc_raw.get("RateTotalAmount"))
         taxable = _coerce_float(tc_raw.get("TaxableAmount"))
 
         vat_mult = 1.0 + (self.vat_pct / 100.0 if self.vat_pct else 0.0)
 
-        # Caso comune osservato:
-        # TaxableAmount = pre-IVA, RateTotalAmount = totale IVA incl, EstimatedTotalAmount = 0
         if taxable is not None and rate is not None and rate > 0 and taxable > 0 and rate >= taxable:
             pre_vat = taxable
             total = est if (est is not None and est > 0) else rate
             return float(pre_vat), float(total)
 
-        # Se EstimatedTotalAmount è valorizzato e TaxableAmount esiste
         if taxable is not None and est is not None and est > 0:
             return float(taxable), float(est)
 
-        # Se est e rate sono entrambi presenti e positivi, prova a capire chi è totale
         if est is not None and rate is not None and est > 0 and rate > 0:
             if est >= rate:
                 total = est
@@ -801,13 +1907,11 @@ class MyRentAdapter:
                 pre_vat = est
             return float(pre_vat), float(total)
 
-        # Fallback: se c'è rate, assumilo come totale IVA incl e derivane pre-IVA
         if rate is not None and rate > 0:
             total = rate
             pre_vat = round(total / vat_mult, 2) if vat_mult else total
             return float(pre_vat), float(total)
 
-        # Fallback: se c'è est, assumilo come totale IVA incl e derivane pre-IVA
         if est is not None and est > 0:
             total = est
             pre_vat = round(total / vat_mult, 2) if vat_mult else total
@@ -821,6 +1925,7 @@ class MyRentAdapter:
             name = vmm.get("Name") or vmm.get("name")
             if name:
                 return str(name)
+
         if isinstance(vmm, list) and vmm:
             first = vmm[0]
             if isinstance(first, dict):
@@ -828,7 +1933,6 @@ class MyRentAdapter:
                 if name:
                     return str(name)
 
-        # fallback su groupWebDescription
         gw = veh_raw.get("groupWebDescription")
         if gw:
             return str(gw)
@@ -854,7 +1958,7 @@ class MyRentAdapter:
             return {}
         if isinstance(obj, dict):
             return obj
-        # dataclass SDK: to_dict()
+
         if hasattr(obj, "to_dict") and callable(getattr(obj, "to_dict")):
             try:
                 d = obj.to_dict()
@@ -862,30 +1966,24 @@ class MyRentAdapter:
                     return d
             except Exception:
                 pass
-        # dataclass generico
+
         try:
             return asdict(obj)
         except Exception:
             pass
-        # fallback
+
         try:
             return dict(getattr(obj, "__dict__", {}) or {})
         except Exception:
             return {}
 
+    # ----------------------------- Vehicles cache & catalog -----------------------------
     def _vehicles_cache_key(self, *, location: str, age: int, channel: Optional[str]) -> str:
-        """
-        Chiave cache. Include location + age + channel.
-        (Se vuoi cache separata per macroDescription ecc, aggiungi qui i campi.)
-        """
         loc = (location or "").strip().upper()
         ch = (channel or "").strip().upper()
         return f"{loc}|age={int(age)}|channel={ch}"
 
     def _vehicles_cache_get(self, key: str) -> Optional[List[Dict[str, Any]]]:
-        """
-        Ritorna data se presente e non scaduta.
-        """
         if self._vehicles_cache_ttl_sec <= 0:
             return None
 
@@ -898,22 +1996,16 @@ class MyRentAdapter:
             ts = entry.get("ts")
             data = entry.get("data")
             if not isinstance(ts, (int, float)) or not isinstance(data, list):
-                # entry corrotta -> elimina
                 self._vehicles_cache.pop(key, None)
                 return None
 
             if (now - float(ts)) > float(self._vehicles_cache_ttl_sec):
-                # expired
                 self._vehicles_cache.pop(key, None)
                 return None
 
-            # ritorna direttamente la lista (è ok; se vuoi immutabilità, fai copy)
             return data
 
     def _vehicles_cache_set(self, key: str, data: List[Dict[str, Any]]) -> None:
-        """
-        Salva data in cache.
-        """
         if self._vehicles_cache_ttl_sec <= 0:
             return
 
@@ -922,10 +2014,6 @@ class MyRentAdapter:
             self._vehicles_cache[key] = {"ts": now, "data": data}
 
     def _vehicles_cache_prune(self) -> None:
-        """
-        Pulizia best-effort: rimuove entry scadute.
-        La puoi chiamare occasionalmente (es. prima di set) per evitare crescita memoria.
-        """
         if self._vehicles_cache_ttl_sec <= 0:
             return
 
@@ -1011,31 +2099,22 @@ class MyRentAdapter:
         age: int = 30,
         channel: Optional[str] = None,
     ) -> List[Dict[str, Any]]:
-        """
-        - Cache in memoria (TTL) per evitare 8 quotazioni ad ogni refresh.
-        - Se cache miss: 8 quotazioni (oggi+5 e oggi+10 × 2/4/6/8 giorni), merge & dedupe.
-        - Output: lista di dict compatibili con VehicleGroupRaw (schema /vehicles invariato).
-        """
         self._ensure_authenticated()
 
         loc = (location or "").strip().upper()
         if not loc:
             raise MyRentAdapterError("location vuota per list_vehicles_by_location(source=MYRENT)")
 
-        # ------------------- CACHE GET -------------------
         cache_key = self._vehicles_cache_key(location=loc, age=int(age), channel=channel)
         cached = self._vehicles_cache_get(cache_key)
         if cached is not None:
             return cached
 
-        # (best-effort) pulizia entry scadute per limitare crescita memoria
         self._vehicles_cache_prune()
 
-        # ------------------- 8 PROBE QUOTATIONS -------------------
         start_offsets_days = [5, 10]
         durations_days = [2, 4, 6, 8]
 
-        # orario stabile 10:00 UTC (evita outliers notturni)
         now = datetime.utcnow()
         base_time = now.replace(hour=10, minute=0, second=0, microsecond=0)
 
@@ -1054,7 +2133,7 @@ class MyRentAdapter:
                 )
 
                 try:
-                    q = self.get_quotations(wrapper_req)  # -> {"data": {...}}
+                    q = self.get_quotations(wrapper_req)
                     vehicles = (q.get("data") or {}).get("Vehicles") or []
                 except Exception as e:
                     self.log.warning(
@@ -1081,7 +2160,6 @@ class MyRentAdapter:
                     else:
                         existing = merged[key]
 
-                        # merge non distruttivo: riempi campi mancanti
                         for k in [
                             "national_code", "display_name", "vendor_macro", "vehicle_type",
                             "seats", "doors", "transmission", "fuel", "aircon", "image_url"
@@ -1089,7 +2167,6 @@ class MyRentAdapter:
                             if existing.get(k) in (None, "", 0) and item.get(k) not in (None, "", 0):
                                 existing[k] = item[k]
 
-                        # daily_rate: tieni il MIN (prezzo "da")
                         ex_dr = _coerce_float(existing.get("daily_rate"))
                         it_dr = _coerce_float(item.get("daily_rate"))
                         if ex_dr is None:
@@ -1097,22 +2174,16 @@ class MyRentAdapter:
                         elif it_dr is not None:
                             existing["daily_rate"] = min(ex_dr, it_dr)
 
-                        # locations: unione (qui di fatto loc, ma robusto)
                         ex_locs = existing.get("locations") or []
                         it_locs = item.get("locations") or []
                         existing["locations"] = _unique(list(ex_locs) + list(it_locs))
 
         out = list(merged.values())
 
-        # Se tutte fallite -> errore (FastAPI risponde 502)
         if not out and errors:
             raise MyRentAdapterError("Tutte le probe quotations sono fallite: " + " | ".join(errors[:5]))
 
-        # ordinamento stabile (UX + paginazione consistente)
         out.sort(key=lambda x: (str(x.get("vendor_macro") or ""), str(x.get("international_code") or "")))
-
-        # ------------------- CACHE SET -------------------
-        # Salva anche lista vuota (se vuoi evitare hammering su location senza risultati)
         self._vehicles_cache_set(cache_key, out)
 
         return out

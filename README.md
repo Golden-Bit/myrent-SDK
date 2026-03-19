@@ -1,3 +1,6 @@
+uvicorn app.main:app --reload --port 8333 --env-file .env
+
+
 # MyRent REST SDK (Python)
 
 > **Ambiente di riferimento:** `https://sul.myrent.it/MyRentWeb/api/v1/touroperator`  

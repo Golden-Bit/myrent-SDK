@@ -1,0 +1,16 @@
+{
+  "firstName": "Giulia",
+  "lastName": "Verdi",
+  "mobileNumber": "+393491234567",
+  "email": "giulia.verdi@example.com",
+  "birthPlace": "Roma",
+  "birthDate": "1990-09-21",
+  "birthProvince": "RM",
+  "taxCode": "VRDGLI90P61H501X",
+  "document": "PATENTE",
+  "documentNumber": "Y7654321",
+  "licenceType": "B",
+  "issueBy": "Roma",
+  "releaseDate": "2017-03-14",
+  "expiryDate": "2027-03-14"
+}

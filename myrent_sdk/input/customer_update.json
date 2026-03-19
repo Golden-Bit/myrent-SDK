@@ -1,0 +1,17 @@
+{
+  "firstName": "Mario",
+  "lastName": "Rossi",
+  "street": "Via Roma Nuova",
+  "num": "10",
+  "city": "Bari",
+  "zip": "70121",
+  "country": "IT",
+  "mobileNumber": "+393331234567",
+  "email": "mario.rossi.updated@example.com",
+  "birthPlace": "Bari",
+  "birthDate": "1991-03-22",
+  "birthProvince": "BA",
+  "taxCode": "RSSMRA80A01H501U",
+  "isPhysicalPerson": true,
+  "isIndividualCompany": false
+}

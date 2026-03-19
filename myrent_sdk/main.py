@@ -1,11 +1,3 @@
-# myrent_sdk.py
-# SDK MyRent (Authentication + Locations + Quotations + Payments + Bookings)
-# Fix inclusi:
-# - Formato date con secondi "YYYY-MM-DDTHH:MM:SS"
-# - Normalizzazione channel (niente spazi) + fallback a company_code
-# - Gestione agreementCoupon come STRING/opzionale (omesso se non stringa o vuota)
-# - Messaggistica d’errore più chiara per Code 366 ("Not accepting connections")
-# - URL-encoding dei bookingId (spesso contiene spazi: "HQ 46 XXX")
 from __future__ import annotations
 
 from dataclasses import dataclass, field, asdict
@@ -33,7 +25,6 @@ __all__ = [
     "QuotationItem",
     "QuotationData",
     "QuotationResponse",
-    # New: Payments + Bookings
     "PaymentsRequest",
     "PaymentsResponse",
     "BookingOptional",
@@ -78,7 +69,6 @@ def _normalize_base_url(base_url: str) -> str:
 
 
 def _coerce_bool(v: Any) -> Optional[bool]:
-    """Converte true/false (bool, number, string) in bool. Restituisce None se non interpretabile."""
     if v is None:
         return None
     if isinstance(v, bool):
@@ -111,14 +101,6 @@ def _coerce_int(v: Any) -> Optional[int]:
 
 
 def _fmt_dt_iso_seconds(dt: Union[str, datetime]) -> str:
-    """
-    Rende sicuro il formato datetime in stringa **con secondi**:
-      - Se è datetime -> 'YYYY-MM-DDTHH:MM:SS'
-      - Se è stringa:
-          * se è già con i secondi la ritorna com'è
-          * se è in forma 'YYYY-MM-DDTHH:MM' aggiunge ':00'
-          * altrimenti la ritorna com'è (si assume valida per l'API)
-    """
     if isinstance(dt, datetime):
         return dt.replace(microsecond=0).strftime("%Y-%m-%dT%H:%M:%S")
     if isinstance(dt, str):
@@ -132,10 +114,6 @@ def _fmt_dt_iso_seconds(dt: Union[str, datetime]) -> str:
 
 
 def _sanitize_channel(channel: Optional[str]) -> Optional[str]:
-    """
-    Normalizza il channel rimuovendo **tutti** gli spazi.
-    Esempio: 'RENTAL _PREMIUM_PREPAID' -> 'RENTAL_PREMIUM_PREPAID'
-    """
     if channel is None:
         return None
     return channel.replace(" ", "")
@@ -151,10 +129,18 @@ def _maybe_strip(s: Any) -> Optional[str]:
 
 
 def _encode_path_segment(value: str) -> str:
-    """
-    BookingId spesso contiene spazi (es. 'HQ 46 XXX') -> va percent-encodato.
-    """
     return quote((value or "").strip(), safe="")
+
+
+def _nested_get(d: Any, *keys: str, default: Any = None) -> Any:
+    cur = d
+    for k in keys:
+        if not isinstance(cur, dict):
+            return default
+        cur = cur.get(k)
+        if cur is None:
+            return default
+    return cur
 
 
 # =====================================================================================
@@ -163,7 +149,6 @@ def _encode_path_segment(value: str) -> str:
 
 @dataclass(frozen=True)
 class AuthResult:
-    """Schema di output di Authentication (campo `result` nella risposta API)."""
     user_id: int
     username: str
     token_value: str
@@ -181,6 +166,7 @@ class AuthResult:
         )
         if not token:
             raise AuthenticationError(f"Manca tokenValue nella risposta: {payload}")
+
         user_id = _coerce_int(result.get("user_id")) or 0
         username = str(result.get("username", ""))
         user_role = result.get("userRole")
@@ -198,7 +184,6 @@ class AuthResult:
 
 @dataclass(frozen=True)
 class OpeningHours:
-    """Schema per una finestra oraria di apertura nel payload Locations."""
     day_of_the_week: Optional[int] = None
     day_of_the_week_name: Optional[str] = None
     start_time: Optional[str] = None
@@ -211,7 +196,6 @@ class OpeningHours:
 
     @staticmethod
     def from_api_dict(d: Dict[str, Any]) -> "OpeningHours":
-        # accetta sia 'dropoffendTime' che 'dropoffEndTime'
         dropoff_end = d.get("dropoffendTime")
         if dropoff_end is None:
             dropoff_end = d.get("dropoffEndTime")
@@ -234,7 +218,7 @@ class OpeningHours:
             "startTime": self.start_time,
             "endTime": self.end_time,
             "dropoffStartTime": self.dropoff_start_time,
-            "dropoffendTime": self.dropoff_end_time,  # coerente con payload osservato
+            "dropoffendTime": self.dropoff_end_time,
             "isValidPeriod": self.is_valid_period,
             "validFrom": self.valid_from,
             "validTo": self.valid_to,
@@ -243,7 +227,6 @@ class OpeningHours:
 
 @dataclass(frozen=True)
 class Location:
-    """Schema di output per una Location (campi dal payload reale)."""
     location_code: Optional[str] = None
     location_name: Optional[str] = None
     location_address: Optional[str] = None
@@ -258,7 +241,7 @@ class Location:
     longitude: Optional[float] = None
     is_airport: Optional[bool] = None
     is_railway: Optional[bool] = None
-    is_always_opentrue: Optional[bool] = None  # nome “strano” coerente con payload
+    is_always_opentrue: Optional[bool] = None
     is_car_sharing_enabled: Optional[bool] = None
     allow_pickup_dropoff_out_of_hours: Optional[bool] = None
     has_key_box: Optional[bool] = None
@@ -363,11 +346,6 @@ class Location:
 
 
 class LocationType:
-    """Valori ufficiali:
-    - BOOKING_PICKUP = 1
-    - BOOKING_DROPOFF = 2
-    - BOOKING_BOTH   = 3
-    """
     BOOKING_PICKUP: int = 1
     BOOKING_DROPOFF: int = 2
     BOOKING_BOTH: int = 3
@@ -379,31 +357,17 @@ class LocationType:
 
 @dataclass
 class QuotationRequest:
-    """Schema **input** per POST /api/v1/touroperator/quotations.
-
-    Campi minimi:
-    - pickupLocation, dropOffLocation: codici location
-    - startDate, endDate: stringa o datetime (verranno forzati a 'YYYY-MM-DDTHH:MM:SS')
-    - age: età conducente
-    - channel: opzionale -> se non fornito, lo SDK userà company_code (normalizzato)
-
-    Campi opzionali (boolean/string) come da Swagger:
-    showPics, showOptionalImage, showVehicleParameter, showVehicleExtraImage,
-    agreementCoupon (STRING!), discountValueWithoutVat, macroDescription, showBookingDiscount,
-    isYoungDriverAge, isSeniorDriverAge
-    """
     drop_off_location: str
     end_date: Union[str, datetime]
     pickup_location: str
     start_date: Union[str, datetime]
     age: int
-    channel: Optional[str] = None  # verrà normalizzato (spazi rimossi)
+    channel: Optional[str] = None
 
     show_pics: Optional[bool] = None
     show_optional_image: Optional[bool] = None
     show_vehicle_parameter: Optional[bool] = None
     show_vehicle_extra_image: Optional[bool] = None
-    # agreementCoupon è STRING in MyRent: se vuoto/None, viene omesso
     agreement_coupon: Optional[Union[str, bool]] = None
     discount_value_without_vat: Optional[str] = None
     macro_description: Optional[str] = None
@@ -420,11 +384,9 @@ class QuotationRequest:
             "age": int(self.age),
         }
 
-        # channel: se fornito, normalizza rimuovendo spazi
         if self.channel is not None:
             payload["channel"] = _sanitize_channel(self.channel)
 
-        # Opzionali
         opt_map: Dict[str, Any] = {
             "showPics": self.show_pics,
             "showOptionalImage": self.show_optional_image,
@@ -437,7 +399,6 @@ class QuotationRequest:
             "isSeniorDriverAge": self.is_senior_driver_age,
         }
 
-        # agreementCoupon: gestiscilo a parte (solo string non vuota)
         if isinstance(self.agreement_coupon, str) and self.agreement_coupon.strip():
             payload["agreementCoupon"] = self.agreement_coupon.strip()
 
@@ -445,16 +406,14 @@ class QuotationRequest:
             if v is not None:
                 payload[k] = v
 
-        # Compatibilità con swagger “sporchi”
         if self.is_young_driver_age is not None:
-            payload["isyoungDriverAge"] = self.is_young_driver_age  # variante tollerante
+            payload["isyoungDriverAge"] = self.is_young_driver_age
 
         return payload
 
 
 @dataclass(frozen=True)
 class QuotationItem:
-    """Schema **output** per un elemento della lista `quotation` nella risposta."""
     total: Optional[int] = None
     pick_up_location: Optional[str] = None
     return_location: Optional[str] = None
@@ -494,15 +453,11 @@ class QuotationData:
 
     @staticmethod
     def from_api_dict(d: Dict[str, Any]) -> "QuotationData":
-        # ✅ FORMATO "FLAT" (quello che hai nel raw): data = { total, PickUp..., Vehicles:[...] }
         if isinstance(d, dict) and "Vehicles" in d:
             item = QuotationItem.from_api_dict(d)
-            # Nota: spesso TotalCharge NON è a livello root in questo formato (è per-veicolo).
-            # Se c'è a root lo prendiamo, altrimenti lo lasciamo vuoto.
             total_charge = d.get("TotalCharge") or {}
             return QuotationData(quotation=[item], total_charge=total_charge)
 
-        # ✅ FORMATO "CLASSICO": data = { quotation:[...], TotalCharge:{...} }
         q_list = d.get("quotation") or []
         items = [QuotationItem.from_api_dict(x) for x in q_list if isinstance(x, dict)]
         total_charge = d.get("TotalCharge") or {}
@@ -517,19 +472,13 @@ class QuotationData:
 
 @dataclass(frozen=True)
 class QuotationResponse:
-    """Schema **output** radice per la risposta di Quotations."""
     data: QuotationData
     raw: Dict[str, Any] = field(default_factory=dict)
 
     @staticmethod
     def from_api_payload(payload: Dict[str, Any]) -> "QuotationResponse":
-        # Formati possibili osservati:
-        # 1) { "data": {...} }
-        # 2) { "status": true, "message": "...", "data": {...} }
-        # 3) { "data": [ {...}, {...} ] }  (lista “diretta”)
         data_obj = payload.get("data") or payload.get("Data") or {}
         if isinstance(data_obj, list):
-            # Lista diretta -> la mappo come "quotation"
             items = [QuotationItem.from_api_dict(x) for x in data_obj if isinstance(x, dict)]
             qdata = QuotationData(quotation=items, total_charge={})
         elif isinstance(data_obj, dict):
@@ -548,7 +497,6 @@ class QuotationResponse:
 
 @dataclass
 class PaymentsRequest:
-    """Body per POST /api/v1/touroperator/payments"""
     language: str = "it"
 
     def to_payload(self) -> Dict[str, Any]:
@@ -557,10 +505,6 @@ class PaymentsRequest:
 
 @dataclass(frozen=True)
 class PaymentsResponse:
-    """
-    Risposta tipicamente “libera” (wireTransfer, paypal, Nexi, stripe, ...).
-    La manteniamo raw ma con un wrapper coerente.
-    """
     raw: Dict[str, Any] = field(default_factory=dict)
 
     @staticmethod
@@ -569,6 +513,9 @@ class PaymentsResponse:
             return PaymentsResponse(raw=payload)
         return PaymentsResponse(raw={"raw": payload})
 
+    def to_dict(self) -> Dict[str, Any]:
+        return asdict(self)
+
 
 # =====================================================================================
 # SCHEMI (Bookings)
@@ -576,11 +523,6 @@ class PaymentsResponse:
 
 @dataclass
 class BookingOptional:
-    """
-    Rappresenta un optional nel body di create booking.
-    Nello spec: 'optionals' è descritto come lista con EquipType, Quantity, Selected, Prepaid.
-    In pratica alcune istanze tollerano anche dict generici.
-    """
     equip_type: Optional[str] = None
     quantity: Optional[int] = None
     selected: Optional[bool] = None
@@ -619,7 +561,6 @@ class BookingCompanyInfo:
 
     def to_dict(self) -> Dict[str, Any]:
         d: Dict[str, Any] = {}
-        # NB: alcuni campi in spec hanno naming “CompanyX”
         mapping = {
             "CompanyPhoneNumber": self.company_phone_number,
             "CompanyEmail": self.company_email,
@@ -642,7 +583,6 @@ class BookingCompanyInfo:
                 d[k] = vv
 
         if self.company_birth_date is not None:
-            # In spec appare ISO con Z, ma accettiamo anche "YYYY-MM-DDTHH:MM:SS"
             if isinstance(self.company_birth_date, datetime):
                 d["CompanyBirthDate"] = self.company_birth_date.replace(microsecond=0).isoformat()
             else:
@@ -653,15 +593,9 @@ class BookingCompanyInfo:
 
 @dataclass
 class BookingCustomer:
-    """
-    Customer nel body booking. Lo spec ha duplicazioni (Name/Surname e firstName/lastName).
-    Qui esponiamo una forma “pulita” ma serializziamo *tutti* i campi quando valorizzati.
-    """
-    # alias principali
     first_name: Optional[str] = None
     last_name: Optional[str] = None
 
-    # campi aggiuntivi spec
     client_id: Optional[str] = None
     ragione_sociale: Optional[str] = None
     codice: Optional[str] = None
@@ -680,7 +614,7 @@ class BookingCustomer:
     birth_date: Optional[Union[str, datetime]] = None
     birth_province: Optional[str] = None
     birth_nation: Optional[str] = None
-    gender: Optional[bool] = None  # true=Male, false=Female (spec)
+    gender: Optional[bool] = None
     tax_code: Optional[str] = None
     document: Optional[str] = None
     document_number: Optional[str] = None
@@ -690,13 +624,12 @@ class BookingCustomer:
     expiry_date: Optional[Union[str, datetime]] = None
     e_invoice_email: Optional[str] = None
     e_invoice_code: Optional[str] = None
-    is_physical_person: Optional[Union[str, bool]] = None  # spesso "true"/"false"
+    is_physical_person: Optional[Union[str, bool]] = None
     is_individual_company: Optional[Union[str, bool]] = None
 
     def to_dict(self) -> Dict[str, Any]:
         d: Dict[str, Any] = {}
 
-        # Spec: supporta sia Name/Surname sia firstName/lastName
         fn = _maybe_strip(self.first_name)
         ln = _maybe_strip(self.last_name)
         if fn is not None:
@@ -749,12 +682,12 @@ class BookingCustomer:
         if self.expiry_date is not None:
             d["expiryDate"] = _fmt_dt_iso_seconds(self.expiry_date) if isinstance(self.expiry_date, datetime) else str(self.expiry_date).strip()
 
-        # Flag string/bool (“true”/“false” spesso)
         if self.is_physical_person is not None:
             if isinstance(self.is_physical_person, bool):
                 d["isPhysicalPerson"] = str(self.is_physical_person).lower()
             else:
                 d["isPhysicalPerson"] = str(self.is_physical_person).strip()
+
         if self.is_individual_company is not None:
             if isinstance(self.is_individual_company, bool):
                 d["isIndividualCompany"] = str(self.is_individual_company).lower()
@@ -783,14 +716,11 @@ class BookingFee:
 
 @dataclass
 class BookingVehicleRequest:
-    """
-    VehicleRequest nel body booking.
-    PaymentType: valori documentati (BONIFICO/PayPal/CREDITCARDDEFERRED/CUSTOMCREDITCARD)
-    """
     payment_type: Optional[str] = None
     type: Optional[str] = None
     payment_amount: Optional[float] = None
     payment_transaction_type_code: Optional[str] = None
+    voucher_number: Optional[str] = None
 
     def to_dict(self) -> Dict[str, Any]:
         d: Dict[str, Any] = {}
@@ -802,24 +732,13 @@ class BookingVehicleRequest:
             d["PaymentAmount"] = float(self.payment_amount)
         if self.payment_transaction_type_code is not None:
             d["PaymentTransactionTypeCode"] = str(self.payment_transaction_type_code)
+        if self.voucher_number is not None:
+            d["VoucherNumber"] = str(self.voucher_number)
         return d
 
 
 @dataclass
 class BookingRequest:
-    """
-    Body per POST /api/v1/touroperator/bookings.
-
-    Minimo “realistico”:
-      - pickupLocation, dropOffLocation
-      - startDate, endDate
-      - channel (fallback a company_code nel client)
-      - VehicleCode
-      - Customer
-      - VehicleRequest (almeno PaymentType, se richiesto dall’istanza)
-
-    Nota: lo spec è incoerente su optionals (object/array): qui supportiamo entrambe.
-    """
     drop_off_location: str
     pickup_location: str
     start_date: Union[str, datetime]
@@ -858,7 +777,6 @@ class BookingRequest:
         if self.channel is not None:
             payload["channel"] = _sanitize_channel(self.channel)
 
-        # optionals: lista di dict o BookingOptional
         if self.optionals is not None:
             opt_list: List[Dict[str, Any]] = []
             for o in self.optionals:
@@ -891,7 +809,6 @@ class BookingRequest:
         if self.is_senior_driver_age is not None:
             payload["isSeniorDriverAge"] = bool(self.is_senior_driver_age)
 
-        # agreementCoupon: includi SOLO se stringa non vuota
         if isinstance(self.agreement_coupon, str) and self.agreement_coupon.strip():
             payload["agreementCoupon"] = self.agreement_coupon.strip()
 
@@ -920,25 +837,105 @@ class BookingRequest:
 
 @dataclass(frozen=True)
 class Booking:
-    """
-    Booking “libero” lato response: lo spec è molto grande e incoerente.
-    Qui estraiamo id e conserviamo raw.
-    """
     id: Optional[str] = None
+    db_id: Optional[str] = None
+    status: Optional[str] = None
+    type: Optional[str] = None
+    company_name: Optional[str] = None
+    url: Optional[str] = None
+
+    pick_up_date_time: Optional[str] = None
+    pick_up_location: Optional[str] = None
+    return_date_time: Optional[str] = None
+    return_location: Optional[str] = None
+
+    vehicle_code: Optional[str] = None
+    vehicle_make_model: Optional[str] = None
+    vehicle_brand: Optional[str] = None
+    vehicle_model: Optional[str] = None
+    vehicle_plate_no: Optional[str] = None
+
+    rate_total_amount: Optional[float] = None
+    estimated_total_amount: Optional[float] = None
+    currency_code: Optional[str] = None
+
+    customer_id: Optional[str] = None
+    customer_first_name: Optional[str] = None
+    customer_last_name: Optional[str] = None
+    customer_email: Optional[str] = None
+    customer_mobile_number: Optional[str] = None
+    customer_tax_code: Optional[str] = None
+
+    vendor: Optional[str] = None
+
+    optionals: List[Dict[str, Any]] = field(default_factory=list)
+    payment_role: List[Dict[str, Any]] = field(default_factory=list)
+    location_details: List[Dict[str, Any]] = field(default_factory=list)
+    rental_rate: Dict[str, Any] = field(default_factory=dict)
+    total_charge: Dict[str, Any] = field(default_factory=dict)
+    vehicle: Dict[str, Any] = field(default_factory=dict)
+    customer: Dict[str, Any] = field(default_factory=dict)
     raw: Dict[str, Any] = field(default_factory=dict)
 
     @staticmethod
     def from_api_dict(d: Dict[str, Any]) -> "Booking":
-        booking_id = d.get("id") or d.get("Id") or d.get("bookingId") or d.get("BookingId")
-        return Booking(id=str(booking_id) if booking_id is not None else None, raw=d)
+        vehicle = d.get("Vehicle") if isinstance(d.get("Vehicle"), dict) else {}
+        total_charge = d.get("TotalCharge") if isinstance(d.get("TotalCharge"), dict) else {}
+        rental_rate = d.get("RentalRate") if isinstance(d.get("RentalRate"), dict) else {}
+        customer = d.get("customer") if isinstance(d.get("customer"), dict) else {}
+
+        return Booking(
+            id=_maybe_strip(d.get("id") or d.get("Id") or d.get("bookingId") or d.get("BookingId")),
+            db_id=_maybe_strip(d.get("dbId") or d.get("DbId")),
+            status=_maybe_strip(d.get("Status") or d.get("status")),
+            type=_maybe_strip(d.get("Type") or d.get("type")),
+            company_name=_maybe_strip(d.get("CompanyName") or d.get("companyName")),
+            url=_maybe_strip(d.get("URL") or d.get("Url") or d.get("url")),
+
+            pick_up_date_time=_maybe_strip(d.get("PickUpDateTime") or d.get("pickUpDateTime")),
+            pick_up_location=_maybe_strip(d.get("PickUpLocation") or d.get("pickUpLocation")),
+            return_date_time=_maybe_strip(d.get("ReturnDateTime") or d.get("returnDateTime")),
+            return_location=_maybe_strip(d.get("ReturnLocation") or d.get("returnLocation")),
+
+            vehicle_code=_maybe_strip(vehicle.get("Code") or vehicle.get("code")),
+            vehicle_make_model=_maybe_strip(_nested_get(vehicle, "VehMakeModel", "Name")),
+            vehicle_brand=_maybe_strip(vehicle.get("brand")),
+            vehicle_model=_maybe_strip(vehicle.get("model")),
+            vehicle_plate_no=_maybe_strip(vehicle.get("plate_no") or vehicle.get("plateNo")),
+
+            rate_total_amount=_coerce_float(total_charge.get("RateTotalAmount")),
+            estimated_total_amount=_coerce_float(total_charge.get("EstimatedTotalAmount")),
+            currency_code=_maybe_strip(rental_rate.get("CurrencyCode") or total_charge.get("CurrencyCode")),
+
+            customer_id=_maybe_strip(customer.get("clientId") or customer.get("id")),
+            customer_first_name=_maybe_strip(
+                customer.get("firstName") or customer.get("GivenName") or customer.get("Name")
+            ),
+            customer_last_name=_maybe_strip(
+                customer.get("lastName") or customer.get("Surname")
+            ),
+            customer_email=_maybe_strip(customer.get("email")),
+            customer_mobile_number=_maybe_strip(customer.get("mobileNumber")),
+            customer_tax_code=_maybe_strip(customer.get("taxCode")),
+
+            vendor=_maybe_strip(d.get("Vendor") or d.get("vendor")),
+
+            optionals=list(d.get("optionals") or []),
+            payment_role=list(d.get("paymentRole") or []),
+            location_details=list(d.get("LocationDetails") or []),
+            rental_rate=rental_rate,
+            total_charge=total_charge,
+            vehicle=vehicle,
+            customer=customer,
+            raw=d,
+        )
 
     def to_dict(self) -> Dict[str, Any]:
-        return {"id": self.id, "raw": self.raw}
+        return asdict(self)
 
 
 @dataclass(frozen=True)
 class BookingResponse:
-    """Wrapper della response di create/get booking."""
     data: List[Booking] = field(default_factory=list)
     raw: Dict[str, Any] = field(default_factory=dict)
 
@@ -947,27 +944,26 @@ class BookingResponse:
         if not isinstance(payload, dict):
             return BookingResponse(data=[], raw={"raw": payload})
 
-        # Formati possibili:
-        # - {"data":[{...},{...}]}
-        # - {"result":[{...},{...}]}
-        # - {"data":{...}} (raro) -> lo wrappiamo in lista
         node = payload.get("data")
         if node is None:
             node = payload.get("result")
+
         items: List[Dict[str, Any]] = []
         if isinstance(node, list):
             items = [x for x in node if isinstance(x, dict)]
         elif isinstance(node, dict):
             items = [node]
-        elif isinstance(payload, dict) and any(k in payload for k in ("id", "Id", "bookingId")):
-            # payload “piatto”
+        elif any(k in payload for k in ("id", "Id", "bookingId", "BookingId")):
             items = [payload]
 
         bookings = [Booking.from_api_dict(x) for x in items]
         return BookingResponse(data=bookings, raw=payload)
 
     def to_dict(self) -> Dict[str, Any]:
-        return {"data": [b.to_dict() for b in self.data], "raw": self.raw}
+        return {
+            "data": [b.to_dict() for b in self.data],
+            "raw": self.raw,
+        }
 
 
 @dataclass(frozen=True)
@@ -978,13 +974,24 @@ class BookingStatus:
 
     @staticmethod
     def from_api_payload(payload: Any) -> "BookingStatus":
-        if isinstance(payload, dict):
-            return BookingStatus(
-                id=_maybe_strip(payload.get("id") or payload.get("Id")),
-                status=_maybe_strip(payload.get("status") or payload.get("Status")),
-                raw=payload,
-            )
-        return BookingStatus(raw={"raw": payload})
+        if not isinstance(payload, dict):
+            return BookingStatus(raw={"raw": payload})
+
+        data = payload.get("data", payload)
+        if isinstance(data, list):
+            data = data[0] if data else {}
+
+        if not isinstance(data, dict):
+            data = {}
+
+        return BookingStatus(
+            id=_maybe_strip(data.get("id") or data.get("Id")),
+            status=_maybe_strip(data.get("status") or data.get("Status")),
+            raw=payload,
+        )
+
+    def to_dict(self) -> Dict[str, Any]:
+        return asdict(self)
 
 
 @dataclass(frozen=True)
@@ -995,13 +1002,29 @@ class CancelResult:
 
     @staticmethod
     def from_api_payload(payload: Any) -> "CancelResult":
-        if isinstance(payload, dict):
-            return CancelResult(
-                id=_maybe_strip(payload.get("id") or payload.get("Id")),
-                cancel_status=_maybe_strip(payload.get("CancelStatus") or payload.get("cancelStatus")),
-                raw=payload,
-            )
-        return CancelResult(raw={"raw": payload})
+        if not isinstance(payload, dict):
+            return CancelResult(raw={"raw": payload})
+
+        data = payload.get("data", payload)
+        if isinstance(data, list):
+            data = data[0] if data else {}
+
+        if not isinstance(data, dict):
+            data = {}
+
+        return CancelResult(
+            id=_maybe_strip(data.get("id") or data.get("Id")),
+            cancel_status=_maybe_strip(
+                data.get("CancelStatus")
+                or data.get("cancelStatus")
+                or data.get("status")
+                or data.get("Status")
+            ),
+            raw=payload,
+        )
+
+    def to_dict(self) -> Dict[str, Any]:
+        return asdict(self)
 
 
 # =====================================================================================
@@ -1009,32 +1032,6 @@ class CancelResult:
 # =====================================================================================
 
 class MyRentClient:
-    """MyRent Booking API SDK
-
-    Endpoints:
-      - POST /api/v1/touroperator/authentication
-      - GET  /api/v1/touroperator/locations              (header: tokenValue)
-      - POST /api/v1/touroperator/quotations             (header: tokenValue)
-      - POST /api/v1/touroperator/payments               (header: tokenValue)
-      - POST /api/v1/touroperator/bookings               (header: tokenValue)
-      - GET  /api/v1/touroperator/bookings/{bookingId}   (header: tokenValue + channel)
-      - GET  /api/v1/touroperator/bookings/{bookingId}/status
-      - GET  /api/v1/touroperator/bookings/{bookingId}/cancel (header: tokenValue + channel)
-
-    Parametri:
-      base_url      (str)  es. "https://sul.myrent.it/MyRentWeb"
-      user_id       (str)  es. "bookingservice"
-      password      (str)  es. "123booking"
-      company_code  (str)  es. "sul"
-      token_value   (str)  opzionale: se già disponibile
-      timeout       (sec)  default 30
-      max_retries   (int)  default 3 (429/5xx/timeout)
-      backoff_factor(float) default 0.5
-      user_agent    (str)  opzionale
-      logger        (logging.Logger) opzionale
-      session       (requests.Session) opzionale
-    """
-
     AUTH_PATH = "/api/v1/touroperator/authentication"
     LOCATIONS_PATH = "/api/v1/touroperator/locations"
     QUOTATIONS_PATH = "/api/v1/touroperator/quotations"
@@ -1067,7 +1064,7 @@ class MyRentClient:
         self.timeout = float(timeout)
         self.max_retries = int(max_retries)
         self.backoff_factor = float(backoff_factor)
-        self.user_agent = user_agent or "myrent-sdk/0.5"
+        self.user_agent = user_agent or "myrent-sdk/0.6"
         self.log = logger or logging.getLogger("myrent_sdk")
         if not self.log.handlers:
             handler = logging.StreamHandler()
@@ -1121,7 +1118,6 @@ class MyRentClient:
                 if 200 <= resp.status_code < 300:
                     return resp
 
-                # 401 -> token invalid/expired (spesso)
                 if resp.status_code == 401:
                     try:
                         payload = resp.json()
@@ -1131,13 +1127,11 @@ class MyRentClient:
                         f"HTTP 401 {method} {url}: token non valido/scaduto | payload={json.dumps(payload)[:800]}"
                     )
 
-                # 429 o 5xx -> retry con backoff
                 if resp.status_code in (429,) or 500 <= resp.status_code < 600:
                     self._sleep_backoff(attempt)
                     attempt += 1
                     continue
 
-                # errori non retryable
                 try:
                     payload = resp.json()
                 except Exception:
@@ -1171,7 +1165,6 @@ class MyRentClient:
     def _require_channel(self, channel: Optional[str]) -> str:
         ch = _sanitize_channel(channel)
         if not ch:
-            # fallback a company_code
             ch = _sanitize_channel(self.company_code)
         if not ch:
             raise APIError("channel mancante e company_code non impostato sul client.")
@@ -1208,10 +1201,6 @@ class MyRentClient:
         resp = self._request("GET", self.LOCATIONS_PATH, headers=headers)
         payload = self._parse_json(resp)
 
-        # Formati osservati:
-        # - [{"locationCode":...}, ...]
-        # - {"result":[...]}
-        # - {"data":[...]} (alcune istanze)
         if isinstance(payload, dict) and isinstance(payload.get("result"), list):
             raw_list = payload["result"]
         elif isinstance(payload, dict) and isinstance(payload.get("data"), list):
@@ -1236,39 +1225,22 @@ class MyRentClient:
 
     # -------------------- Quotations --------------------
     def get_quotations(self, request: QuotationRequest) -> QuotationResponse:
-        """
-        Esegue una quotazione.
-
-        Header: tokenValue
-        Body:   vedi QuotationRequest.to_payload()
-        Output: QuotationResponse (data.quotation, data.TotalCharge)
-
-        Fix inclusi:
-          - startDate/endDate forzati con secondi
-          - normalizzazione channel (rimozione spazi)
-          - omissione agreementCoupon se non stringa
-          - messaggio esplicativo per error code 366
-        """
         headers = {"tokenValue": self.token_value}
         payload = request.to_payload()
 
-        # Se channel non è stato passato, usa company_code come channel (normalizzato)
         if "channel" not in payload:
             payload["channel"] = self._require_channel(None)
 
-        # Se il channel contiene ancora spazi (caso anomalo), fail fast
         if " " in payload.get("channel", ""):
             raise APIError(f"Il channel contiene spazi non validi: '{payload['channel']}'")
 
         resp = self._request("POST", self.QUOTATIONS_PATH, headers=headers, json_body=payload)
 
-        # prova subito a leggere JSON
         try:
             raw = resp.json()
         except Exception:
             raw = {"raw": resp.text}
 
-        # Mappatura errori applicativi nota
         if isinstance(raw, dict):
             status = str(raw.get("status", "")).lower()
             err_node = (((raw.get("data") or {}).get("errors") or {}).get("Error") or {})
@@ -1294,43 +1266,23 @@ class MyRentClient:
             raise APIError("Formato inatteso della risposta di quotations.")
         return QuotationResponse.from_api_payload(data)
 
-    # =================================================================================
-    # NEW ENDPOINTS: payments(), create_booking(), get_booking(), get_booking_status(),
-    #                cancel_booking()
-    # =================================================================================
-
     # -------------------- Payments --------------------
-    def payments(self, request: Optional[PaymentsRequest] = None) -> PaymentsResponse:
-        """
-        POST /api/v1/touroperator/payments
-        Header: tokenValue
-        Body: { "language": "it" | "en" | ... }
-
-        Ritorna PaymentsResponse(raw=...).
-        """
+    def payments(self, request: Optional[PaymentsRequest] = None, *, channel: Optional[str] = None) -> PaymentsResponse:
         req = request or PaymentsRequest()
         headers = {"tokenValue": self.token_value}
+
+        if channel:
+            headers["channel"] = self._require_channel(channel)
+
         resp = self._request("POST", self.PAYMENTS_PATH, headers=headers, json_body=req.to_payload())
         payload = self._parse_json(resp)
         return PaymentsResponse.from_api_payload(payload)
 
     # -------------------- Create Booking --------------------
     def create_booking(self, request: BookingRequest) -> BookingResponse:
-        """
-        POST /api/v1/touroperator/bookings
-        Header: tokenValue
-        Body: BookingRequest.to_payload()
-
-        Fix inclusi:
-          - startDate/endDate forzati con secondi
-          - normalizzazione channel (rimozione spazi) + fallback company_code
-          - omissione agreementCoupon se non stringa
-          - URL/bookingId non rilevante qui (POST)
-        """
         headers = {"tokenValue": self.token_value}
         payload = request.to_payload()
 
-        # channel: se non presente nel request, fallback a company_code
         if "channel" not in payload:
             payload["channel"] = self._require_channel(None)
         else:
@@ -1342,12 +1294,6 @@ class MyRentClient:
 
     # -------------------- Get Booking (Dettaglio) --------------------
     def get_booking(self, booking_id: str, channel: Optional[str]) -> BookingResponse:
-        """
-        GET /api/v1/touroperator/bookings/{bookingId}
-        Header: tokenValue + channel (OBBLIGATORIO nello spec)
-
-        Nota: bookingId spesso contiene spazi -> viene URL-encodato.
-        """
         bid = _encode_path_segment(booking_id)
         ch = self._require_channel(channel)
         headers = {"tokenValue": self.token_value, "channel": ch}
@@ -1359,10 +1305,6 @@ class MyRentClient:
 
     # -------------------- Get Booking Status --------------------
     def get_booking_status(self, booking_id: str) -> BookingStatus:
-        """
-        GET /api/v1/touroperator/bookings/{bookingId}/status
-        Header: tokenValue
-        """
         bid = _encode_path_segment(booking_id)
         headers = {"tokenValue": self.token_value}
 
@@ -1373,10 +1315,6 @@ class MyRentClient:
 
     # -------------------- Cancel Booking --------------------
     def cancel_booking(self, booking_id: str, channel: Optional[str]) -> CancelResult:
-        """
-        GET /api/v1/touroperator/bookings/{bookingId}/cancel
-        Header: tokenValue + channel (OBBLIGATORIO nello spec)
-        """
         bid = _encode_path_segment(booking_id)
         ch = self._require_channel(channel)
         headers = {"tokenValue": self.token_value, "channel": ch}

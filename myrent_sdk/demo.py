@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 from typing import Any, Optional
@@ -28,22 +29,25 @@ COMPANY_CODE = "sul"
 PICKUP_LOCATION = "BRI"
 DROPOFF_LOCATION = "BRI"
 
-CHANNEL = "RENTAL_PREMIUM_POA"  # oppure "RENTAL_PREMIUM_PREPAID" se abilitato lato MyRent
+CHANNEL = "RENTAL_PREMIUM_POA"
 DRIVER_AGE = 35
 
-START_DT = datetime.now().replace(minute=0, second=0, microsecond=0) + timedelta(days=5)
+START_DT = datetime.now().replace(minute=0, second=0, hour=11, microsecond=0) + timedelta(days=5, hours=0)
 END_DT = START_DT + timedelta(days=3)
 
-FORCE_PAYMENT_TYPE = None  # es. "BONIFICO"
+VOUCHER_NUMBER = "TESTDOGMA"
+PAYMENT_TRANSACTION_TYPE_CODE = "charge"
+VEHICLE_REQUEST_TYPE = "Payment"
+FORCE_PAYMENT_TYPE = "---3BONIFICO---3"
 
 CREATE_BOOKING = True
-CANCEL_BOOKING = True
+CANCEL_BOOKING = False
 
 ROME_TZ = ZoneInfo("Europe/Rome")
 
 
 # =====================================================================================
-# DEBUG CLIENT (non modifica l'SDK: ma ti fa vedere 429/5xx con body)
+# DEBUG CLIENT
 # =====================================================================================
 
 class DebugMyRentClient(MyRentClient):
@@ -55,6 +59,12 @@ class DebugMyRentClient(MyRentClient):
         attempt = 0
         last_exc: Optional[Exception] = None
         last_retryable_http: Optional[dict] = None
+
+        try:
+            if json_body is not None and ("booking" in path.lower()):
+                print("[DEBUG] OUTGOING JSON:", _json.dumps(json_body, ensure_ascii=False, indent=2)[:4000])
+        except Exception:
+            pass
 
         while attempt <= self.max_retries:
             try:
@@ -150,12 +160,6 @@ def _to_dict(obj: Any) -> dict:
 
 
 def _parse_iso_dt(s: str) -> Optional[datetime]:
-    """
-    Parsea stringhe tipo:
-    - 2026-01-07T12:00:00.000Z
-    - 2026-01-07T12:00:00Z
-    - 2026-01-07T12:00:00+00:00
-    """
     if not isinstance(s, str) or not s.strip():
         return None
     s = s.strip()
@@ -164,7 +168,6 @@ def _parse_iso_dt(s: str) -> Optional[datetime]:
     try:
         return datetime.fromisoformat(s)
     except Exception:
-        # prova a togliere i millisecondi se presente
         if "." in s:
             s2 = s.split(".")[0] + s[s.find("+"):] if "+" in s else s.split(".")[0]
             try:
@@ -185,14 +188,10 @@ def _extract_quote_canonical_datetimes(quote_obj: Any) -> tuple[Optional[datetim
 
 
 def _canonical_to_local_naive(dt_utc_aware: datetime) -> datetime:
-    """
-    Converte datetime aware (UTC) -> ora Europa/Roma (naive) da inviare a MyRent.
-    """
     return dt_utc_aware.astimezone(ROME_TZ).replace(tzinfo=None)
 
 
 def _flatten_quotation_to_vehicle_list(quote_obj: Any) -> list[dict]:
-    # via oggetti SDK
     qdata = getattr(quote_obj, "data", None)
     qlist = getattr(qdata, "quotation", None)
     if isinstance(qlist, list) and qlist:
@@ -201,7 +200,6 @@ def _flatten_quotation_to_vehicle_list(quote_obj: Any) -> list[dict]:
         if isinstance(vs, list):
             return [v for v in vs if isinstance(v, dict)]
 
-    # fallback via to_dict
     qd = _to_dict(quote_obj)
     quotation = _safe_get(qd, "data", "quotation", default=[])
     if isinstance(quotation, list) and quotation and isinstance(quotation[0], dict):
@@ -222,12 +220,6 @@ def _extract_vehicle_code(vehicle: dict) -> Optional[str]:
 
 
 def _normalize_optional_dict(o: dict) -> Optional[dict]:
-    """
-    MyRent booking vuole SOLO questi campi.
-    EquipType di solito sta in:
-      - o["EquipType"]
-      - o["Equipment"]["EquipType"]
-    """
     equip_type = o.get("EquipType") or _safe_get(o, "Equipment", "EquipType") or _safe_get(o, "Equipment", "equipType")
     if not equip_type:
         return None
@@ -244,7 +236,6 @@ def _normalize_optional_dict(o: dict) -> Optional[dict]:
     if prepaid is None:
         prepaid = False
 
-    # se lo includiamo, deve essere Selected=True
     return {
         "EquipType": str(equip_type),
         "Quantity": qty,
@@ -254,12 +245,6 @@ def _normalize_optional_dict(o: dict) -> Optional[dict]:
 
 
 def _extract_required_optionals_for_booking(vehicle: dict) -> list[dict]:
-    """
-    Include:
-    - quelli già Selected=True
-    - quelli "inclusi in tariffa": Charge.IncludedInRate / IncludedInEstTotalInd
-    Restituisce optionals NORMALIZZATI (minimi) -> evita 500.
-    """
     opts = vehicle.get("optionals")
     if not isinstance(opts, list):
         return []
@@ -325,6 +310,23 @@ def _extract_error(booking_resp: Any) -> tuple[Optional[int], Optional[str]]:
     return None, None
 
 
+def _extract_payment_amount_from_vehicle(vehicle: dict) -> float:
+    total_charge = vehicle.get("TotalCharge") or {}
+    candidates = [
+        total_charge.get("RateTotalAmount"),
+        total_charge.get("EstimatedTotalAmount"),
+        total_charge.get("TotalAmount"),
+    ]
+    for c in candidates:
+        if c is None:
+            continue
+        try:
+            return float(c)
+        except Exception:
+            pass
+    return 0.0
+
+
 # =====================================================================================
 # FLOW
 # =====================================================================================
@@ -335,7 +337,7 @@ def main():
         user_id=USER_ID,
         password=PASSWORD,
         company_code=COMPANY_CODE,
-        max_retries=1,       # tienilo basso: vedi subito gli errori veri
+        max_retries=1,
         backoff_factor=0.3,
         timeout=30,
     )
@@ -364,19 +366,17 @@ def main():
         show_pics=True,
         show_optional_image=True,
         show_vehicle_parameter=True,
-        show_vehicle_extra_image=False,
+        show_vehicle_extra_image=True,
         agreement_coupon=None,
         discount_value_without_vat="0",
         show_booking_discount=True,
     )
 
     quote = client.get_quotations(req)
-
-    #print(quote.to_dict())
+    print(json.dumps(quote.to_dict(), indent=2, ensure_ascii=False))
 
     canonical_start, canonical_end = _extract_quote_canonical_datetimes(quote)
     if canonical_start and canonical_end:
-        # >>> FIX: UTC aware -> ora locale (naive) per booking
         booking_start_dt = _canonical_to_local_naive(canonical_start)
         booking_end_dt = _canonical_to_local_naive(canonical_end)
         print("Canonical dates from quote (UTC):", canonical_start, "->", canonical_end)
@@ -397,12 +397,16 @@ def main():
         print(f"  [{i}] Status={v.get('Status')} VehicleCode={vc} RateTotal={rate_total}")
 
     print("\n=== 4) PAYMENTS ===")
-    pay_resp = client.payments(PaymentsRequest(language="it"))
-    payment_type = _choose_payment_type(pay_resp)
-    if payment_type:
-        print("PaymentType scelto:", payment_type)
-    else:
-        print("Payments vuoti -> POA tipico, non imposto PaymentType")
+    pay_resp = client.payments(PaymentsRequest(language="it"), channel=CHANNEL)
+    print("Payments raw:", json.dumps(pay_resp.raw, indent=2, ensure_ascii=False))
+
+    payment_type = _choose_payment_type(pay_resp) or FORCE_PAYMENT_TYPE
+    if not payment_type:
+        raise RuntimeError(
+            "PaymentType mancante. Imposta FORCE_PAYMENT_TYPE con il codice esatto richiesto da MyRent."
+        )
+
+    print("PaymentType scelto:", payment_type)
 
     print("\n=== 5) CREATE BOOKING ===")
     if not CREATE_BOOKING:
@@ -422,11 +426,16 @@ def main():
         if not vehicle_code:
             continue
 
-        # >>> FIX: optionals MINIMI (no dict enormi)
         optionals = _extract_required_optionals_for_booking(vehicle)
+        payment_amount = _extract_payment_amount_from_vehicle(vehicle)
 
-        # VehicleRequest: includilo SOLO se hai un payment_type
-        vehicle_request = BookingVehicleRequest(payment_type=payment_type) if payment_type else None
+        vehicle_request = BookingVehicleRequest(
+            payment_type=payment_type,
+            type=VEHICLE_REQUEST_TYPE,
+            payment_amount=payment_amount,
+            payment_transaction_type_code=PAYMENT_TRANSACTION_TYPE_CODE,
+            voucher_number=VOUCHER_NUMBER,
+        )
 
         booking_req = BookingRequest(
             pickup_location=PICKUP_LOCATION,
@@ -454,14 +463,17 @@ def main():
             vehicle_request=vehicle_request,
         )
 
-        print(f"\nTentativo booking [{idx}/{len(vehicles)}] VehicleCode={vehicle_code} optionals={len(optionals)} paymentType={payment_type}")
+        print(
+            f"\nTentativo booking [{idx}/{len(vehicles)}] "
+            f"VehicleCode={vehicle_code} optionals={len(optionals)} "
+            f"paymentType={payment_type} paymentAmount={payment_amount} voucher={VOUCHER_NUMBER}"
+        )
 
         try:
             booking_resp = client.create_booking(booking_req)
         except APIError as e:
             last_error = ("HTTP/APIError", str(e))
             print("  -> APIError:", e)
-            # prova comunque con altra categoria (spesso una passa)
             continue
 
         code, txt = _extract_error(booking_resp)
@@ -473,6 +485,8 @@ def main():
         if booking_resp.data and booking_resp.data[0].id:
             booking_id = booking_resp.data[0].id
             print("  -> SUCCESS BookingId:", booking_id)
+            print("  -> CREATE BOOKING parsed:")
+            print(json.dumps(booking_resp.data[0].to_dict(), indent=2, ensure_ascii=False))
             break
 
         last_error = ("NO_ID", getattr(booking_resp, "raw", None))
@@ -485,10 +499,26 @@ def main():
     booking_detail = client.get_booking(booking_id, channel=CHANNEL)
     print("GetBooking items:", len(booking_detail.data))
     if booking_detail.data:
-        print("GetBooking first id:", booking_detail.data[0].id)
+        first = booking_detail.data[0]
+        print(json.dumps(first.to_dict(), indent=2, ensure_ascii=False))
+        print("GetBooking id:", first.id)
+        print("GetBooking db_id:", first.db_id)
+        print("GetBooking status:", first.status)
+        print("GetBooking voucher/url:", first.url)
+        print("GetBooking pickup:", first.pick_up_location, first.pick_up_date_time)
+        print("GetBooking return:", first.return_location, first.return_date_time)
+        print("GetBooking vehicle_code:", first.vehicle_code)
+        print("GetBooking vehicle_make_model:", first.vehicle_make_model)
+        print("GetBooking plate:", first.vehicle_plate_no)
+        print("GetBooking rate_total_amount:", first.rate_total_amount)
+        print("GetBooking estimated_total_amount:", first.estimated_total_amount)
+        print("GetBooking customer:", first.customer_first_name, first.customer_last_name)
+        print("GetBooking customer_email:", first.customer_email)
+        print("GetBooking vendor:", first.vendor)
 
     print("\n=== 7) GET BOOKING STATUS ===")
     st = client.get_booking_status(booking_id)
+    print(json.dumps(st.to_dict(), indent=2, ensure_ascii=False))
     print("Status id:", st.id)
     print("Status:", st.status)
 
@@ -498,6 +528,7 @@ def main():
         return
 
     cancel = client.cancel_booking(booking_id, channel=CHANNEL)
+    print(json.dumps(cancel.to_dict(), indent=2, ensure_ascii=False))
     print("Cancel id:", cancel.id)
     print("Cancel status:", cancel.cancel_status)
 

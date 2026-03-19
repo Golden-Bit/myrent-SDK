@@ -1,0 +1,16 @@
+{
+  "firstName": "Marco",
+  "lastName": "Neri",
+  "mobileNumber": "+393331998877",
+  "email": "marco.neri@example.com",
+  "birthPlace": "Milano",
+  "birthDate": "1985-11-03",
+  "birthProvince": "MI",
+  "taxCode": "NREMRC85S03F205K",
+  "document": "PATENTE",
+  "documentNumber": "Z9988776",
+  "licenceType": "B",
+  "issueBy": "Milano",
+  "releaseDate": "2016-07-01",
+  "expiryDate": "2026-07-01"
+}
